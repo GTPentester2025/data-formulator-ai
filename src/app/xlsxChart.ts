@@ -4,8 +4,8 @@
 // charts, so the workbook is built with exceljs and the chart parts are
 // injected into the resulting OOXML package afterwards.)
 
-import * as ExcelJS from 'exceljs';
 import JSZip from 'jszip';
+import { columnLetter, escapeXml, nextRelId, resolveSheetPath } from './xlsxOoxml';
 
 export type NativeChartType = 'col' | 'bar' | 'line' | 'area' | 'scatter' | 'pie' | 'doughnut';
 
@@ -32,28 +32,6 @@ const NS_C = 'http://schemas.openxmlformats.org/drawingml/2006/chart';
 const NS_A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
 const NS_R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 const NS_XDR = 'http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing';
-
-// Everything emitted here is element text, never an attribute value, so only
-// the three characters that can end a text node need escaping. Leaving quotes
-// alone keeps sheet references readable: 'ChartData'!$A$2 rather than
-// &apos;ChartData&apos;!$A$2.
-const escapeXml = (value: unknown): string =>
-    String(value ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
-
-/** 1-based column index → spreadsheet column letters (1 → A, 27 → AA). */
-export const columnLetter = (index: number): string => {
-    let n = index;
-    let out = '';
-    while (n > 0) {
-        const rem = (n - 1) % 26;
-        out = String.fromCharCode(65 + rem) + out;
-        n = Math.floor((n - 1) / 26);
-    }
-    return out;
-};
 
 const sheetRef = (sheet: string, col: string, fromRow: number, toRow?: number) =>
     toRow === undefined
@@ -175,29 +153,8 @@ const buildDrawingXml = (relId: string): string =>
     + `<c:chart xmlns:c="${NS_C}" xmlns:r="${NS_R}" r:id="${relId}"/>`
     + `</a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>`;
 
-/** Next free rIdN in a rels document. */
-const nextRelId = (relsXml: string): string => {
-    const used = [...relsXml.matchAll(/Id="rId(\d+)"/g)].map(m => Number(m[1]));
-    return `rId${(used.length ? Math.max(...used) : 0) + 1}`;
-};
-
-/** Resolve the worksheet part path for a sheet name via workbook rels. */
-const resolveSheetPath = async (zip: JSZip, sheetName: string): Promise<string> => {
-    const workbookXml = await zip.file('xl/workbook.xml')!.async('string');
-    const sheetMatch = new RegExp(`<sheet[^>]*name="${sheetName}"[^>]*/>`).exec(workbookXml);
-    if (!sheetMatch) throw new Error(`Worksheet "${sheetName}" not found in workbook`);
-    const relIdMatch = /r:id="([^"]+)"/.exec(sheetMatch[0]);
-    if (!relIdMatch) throw new Error(`Worksheet "${sheetName}" has no relationship id`);
-
-    const relsXml = await zip.file('xl/_rels/workbook.xml.rels')!.async('string');
-    const targetMatch = new RegExp(`<Relationship[^>]*Id="${relIdMatch[1]}"[^>]*Target="([^"]+)"`).exec(relsXml);
-    if (!targetMatch) throw new Error(`No workbook relationship for ${relIdMatch[1]}`);
-
-    return `xl/${targetMatch[1].replace(/^\/?xl\//, '').replace(/^\.\//, '')}`;
-};
-
 /** Add the chart, drawing, rels and content-type entries to an exceljs package. */
-const injectChartParts = async (zip: JSZip, spec: NativeChartSpec): Promise<void> => {
+export const injectChartParts = async (zip: JSZip, spec: NativeChartSpec): Promise<void> => {
     zip.file('xl/charts/chart1.xml', buildChartXml(spec));
 
     // drawing → chart
@@ -246,46 +203,7 @@ const injectChartParts = async (zip: JSZip, spec: NativeChartSpec): Promise<void
     zip.file(ctPath, contentTypes);
 };
 
-const addSheet = (workbook: ExcelJS.Workbook, name: string, rows: any[], columns?: string[]) => {
-    const sheet = workbook.addWorksheet(name);
-    const names = (columns && columns.length > 0) ? columns : Object.keys(rows[0] ?? {});
-    sheet.columns = names.map(n => ({ header: n, key: n, width: Math.min(40, Math.max(12, n.length + 4)) }));
-    for (const row of rows) sheet.addRow(names.map(n => row[n]));
-    sheet.getRow(1).font = { bold: true };
-    return sheet;
-};
+export const CHART_SHEET_NAME = CHART_SHEET;
+export const CHART_DATA_SHEET_NAME = CHART_DATA_SHEET;
 
-/**
- * Build a workbook with three sheets:
- *   Data      — the full source table
- *   ChartData — the exact values the chart plots (its data source)
- *   Chart     — a native, editable Excel chart bound to ChartData ranges
- */
-export const buildXlsxWithNativeChart = async (
-    dataRows: any[],
-    dataColumns: string[] | undefined,
-    spec: NativeChartSpec,
-    dataSheetName = 'Data',
-): Promise<Blob> => {
-    const workbook = new ExcelJS.Workbook();
-    addSheet(workbook, dataSheetName, dataRows, dataColumns);
-
-    // ChartData must be laid out exactly as the chart references it:
-    // column A = categories, columns B.. = one per series.
-    const chartColumns = [spec.categoryField, ...spec.seriesFields];
-    addSheet(workbook, CHART_DATA_SHEET, spec.rows, chartColumns);
-
-    const chartSheet = workbook.addWorksheet(CHART_SHEET);
-    chartSheet.getCell('A1').value = '';
-
-    const buffer = await workbook.xlsx.writeBuffer();
-    const zip = await JSZip.loadAsync(buffer as ArrayBuffer);
-    await injectChartParts(zip, spec);
-
-    return zip.generateAsync({
-        type: 'blob',
-        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    });
-};
-
-export const __testing = { buildChartXml, buildDrawingXml, nextRelId };
+export const __testing = { buildChartXml, buildDrawingXml };

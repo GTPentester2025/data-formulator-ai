@@ -119,16 +119,22 @@ When the analysis is ready, compose the results into a report to share.
 ## Exporting
 
 The chart toolbar (top right of the canvas) has a copy button and a download
-menu:
+menu; every data table has its own **Download Excel** button.
 
 - **Chart image (PNG)** — 2× resolution, matching what is on screen.
-- **Excel — table only (.xlsx)** — the full table, not just the rows on
-  display.
-- **Excel — table + chart (.xlsx)** — three sheets: `Data` (the full table),
-  `ChartData` (the exact values the chart plots), and `Chart` (a real Excel
-  chart bound to the `ChartData` ranges, so it stays editable and updates when
-  those cells change). Chart types Excel cannot draw natively — maps, box
-  plots, radar — fall back to an embedded image.
+- **Excel workbook…** — opens a dialog where you pick what goes in. The table
+  in view is always written as a `Data` sheet; the rest are optional:
+
+| Option | Sheets added | What you get |
+|---|---|---|
+| *(always)* | `Data` | The full table — not just the rows on display. |
+| **Chart** | `ChartData`, `Chart` | A real Excel chart whose series are bound to the `ChartData` ranges, so it stays editable and redraws when those cells change. Chart types Excel cannot draw natively — maps, box plots, radar — fall back to an embedded image. |
+| **Pivot table** | `PivotTable` | A genuine Excel PivotTable over the `Data` sheet, with a pivot cache behind it. Drag fields between Rows, Columns and Values in Excel to re-slice it. |
+| **Source data** | one per upstream table | The tables this result was derived from, walked back to the files you originally loaded — so the workbook shows the whole chain from raw input to result. |
+
+Because everything lands in a single workbook, a reader can follow the process
+end to end: the original uploads, the table the agent produced from them, the
+values behind the chart, and a pivot to explore the numbers further.
 
 ## Documentation
 

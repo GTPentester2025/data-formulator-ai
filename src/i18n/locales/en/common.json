@@ -1014,5 +1014,17 @@
         "threadExpand": "Expand thread",
         "threadCollapse": "Collapse thread",
         "replayPrompt": "Reproduce the following analysis workflow on the currently loaded data. Follow the steps in order, adapting any column references to the columns available in the current dataset. It's fine if the result isn't identical — reproduce the same overall analysis.\n\nBefore making large assumptions, check whether the current data can actually support the workflow. If there is a major discrepancy — e.g. a required field or measure is missing, the granularity or shape is very different, or a step has no sensible equivalent on this data — pause and ask me to confirm how to proceed (or briefly explain the mismatch and your proposed adaptation) instead of guessing. Minor differences (renamed columns, extra columns) can be adapted silently.\n\n{{content}}"
+    },
+    "export": {
+        "excelTitle": "Download Excel",
+        "excelIntro": "The table in view is always included, as a \"Data\" sheet.",
+        "optionChart": "Chart",
+        "optionChartDesc": "A native Excel chart linked to the values it plots, on its own sheet.",
+        "optionPivot": "Pivot table",
+        "optionPivotDesc": "An interactive PivotTable over the data — drag fields to re-slice it in Excel.",
+        "optionSource": "Source data",
+        "optionSourceDesc": "The tables this result was derived from, one sheet each, so the steps are visible.",
+        "cancel": "Cancel",
+        "download": "Download"
     }
 }

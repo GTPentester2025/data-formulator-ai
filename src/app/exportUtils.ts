@@ -5,8 +5,9 @@
 import * as ExcelJS from 'exceljs';
 import * as d3dsv from 'd3-dsv';
 import { getUrls, fetchWithIdentity } from './utils';
-import type { Chart, EncodingItem, FieldItem } from '../components/ComponentType';
+import type { Chart, DictTable, EncodingItem, FieldItem } from '../components/ComponentType';
 import type { NativeChartSpec, NativeChartType } from './xlsxChart';
+import type { PivotFields, WorkbookSheet } from './xlsxWorkbook';
 
 /** Trigger a browser download of `blob` under `filename`. */
 export const triggerBlobDownload = (blob: Blob, filename: string) => {
@@ -273,4 +274,110 @@ export const resolveNativeChartSpec = (
         categoryAxisTitle: categoryField,
         valueAxisTitle: seriesFields.length === 1 ? seriesFields[0] : valueField,
     };
+};
+
+// ── Pivot tables and source-data lineage ────────────────────────────────
+
+/**
+ * Choose which fields land in the pivot's Rows / Columns / Values areas.
+ *
+ * The pivot reads the *unaggregated* Data sheet, so the value field must be
+ * the raw measure rather than the aggregated column the chart plots — Excel
+ * re-does the aggregation itself, which is what makes the pivot re-draggable.
+ */
+export const resolvePivotFields = (
+    chart: Chart | undefined,
+    conceptShelfItems: FieldItem[],
+    dataColumns: string[],
+    dataRows: any[],
+): PivotFields | null => {
+    if (!dataColumns || dataColumns.length < 2 || !dataRows || dataRows.length === 0) return null;
+
+    const has = (name?: string) => !!name && dataColumns.includes(name);
+
+    // Prefer the chart's own encodings, mapped back to the underlying field
+    // names (an aggregated column like `sales_sum` does not exist in the
+    // source table; `sales` does).
+    const baseField = (encoding: EncodingItem | undefined): string | undefined => {
+        if (!encoding?.fieldID) return undefined;
+        const field = conceptShelfItems.find(f => f.id === encoding.fieldID);
+        return field && dataColumns.includes(field.name) ? field.name : undefined;
+    };
+
+    const encodings = (chart?.encodingMap ?? {}) as Record<string, EncodingItem>;
+    let rowField = baseField(encodings.x) ?? baseField(encodings.color);
+    let colField = baseField(encodings.color);
+    let valueField = baseField(encodings.y) ?? baseField(encodings.theta) ?? baseField(encodings.size);
+
+    // A numeric x with a categorical y means the chart runs horizontally.
+    if (has(rowField) && has(valueField) && isNumericColumn(dataRows, rowField)
+        && !isNumericColumn(dataRows, valueField)) {
+        [rowField, valueField] = [valueField, rowField];
+    }
+
+    // Fall back to the table's own shape: first categorical column down the
+    // side, first numeric column summarized.
+    if (!has(rowField)) {
+        rowField = dataColumns.find(c => !isNumericColumn(dataRows, c));
+    }
+    if (!has(valueField) || !isNumericColumn(dataRows, valueField)) {
+        valueField = dataColumns.find(c => isNumericColumn(dataRows, c) && c !== rowField);
+    }
+    if (!has(rowField) || !has(valueField) || rowField === valueField) return null;
+
+    if (colField === rowField || colField === valueField || !has(colField)) {
+        colField = undefined;
+    }
+
+    return {
+        rowField: rowField!,
+        colField,
+        valueField: valueField!,
+        aggregation: 'sum',
+    };
+};
+
+/**
+ * Walk a table's derivation chain back to the tables that were originally
+ * loaded, so an export can carry the inputs a result came from.
+ *
+ * Returns them outermost-first (original uploads before intermediate steps),
+ * excluding `table` itself.
+ */
+export const collectSourceTables = (table: DictTable, allTables: DictTable[]): DictTable[] => {
+    const byId = new Map(allTables.map(t => [t.id, t]));
+    const ordered: DictTable[] = [];
+    const seen = new Set<string>([table.id]);
+
+    const visit = (current: DictTable) => {
+        for (const sourceId of current.derive?.source ?? []) {
+            if (seen.has(sourceId)) continue;
+            seen.add(sourceId);
+            const source = byId.get(sourceId);
+            if (!source) continue;
+            // Depth first, so an original upload is emitted before the
+            // intermediate table that consumed it.
+            visit(source);
+            ordered.push(source);
+        }
+    };
+    visit(table);
+
+    return ordered;
+};
+
+/** Load full rows for each source table so exported sheets are not samples. */
+export const buildSourceSheets = async (tables: DictTable[]): Promise<WorkbookSheet[]> => {
+    const sheets: WorkbookSheet[] = [];
+    for (const table of tables) {
+        const rows = await resolveFullTableRows(
+            table.id, table.rows, !!table.virtual, table.virtual?.rowCount,
+        );
+        sheets.push({
+            name: table.displayId || table.id,
+            rows,
+            columns: table.names,
+        });
+    }
+    return sheets;
 };

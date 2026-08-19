@@ -5,7 +5,9 @@
  */
 import { describe, it, expect } from "vitest";
 import JSZip from "jszip";
-import { buildXlsxWithNativeChart, columnLetter, type NativeChartSpec } from "../../../../src/app/xlsxChart";
+import { type NativeChartSpec } from "../../../../src/app/xlsxChart";
+import { columnLetter } from "../../../../src/app/xlsxOoxml";
+import { buildXlsxWithNativeChart } from "../../../../src/app/xlsxWorkbook";
 
 const spec: NativeChartSpec = {
     type: "col",

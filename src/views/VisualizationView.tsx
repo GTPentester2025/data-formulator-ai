@@ -53,10 +53,12 @@ import { apiRequest } from '../app/apiClient';
 import { getCachedChart } from '../app/chartCache';
 import { localizeGeoUrls } from '../app/geoAssets';
 import {
-    copyPngDataUrlToClipboard, pngDataUrlToBlob, resolveFullTableRows, resolveNativeChartSpec,
-    rowsAndChartToXlsxBlob, rowsToXlsxBlob, safeFileStem, triggerBlobDownload,
+    buildSourceSheets, collectSourceTables, copyPngDataUrlToClipboard, pngDataUrlToBlob,
+    resolveFullTableRows, resolveNativeChartSpec, resolvePivotFields,
+    rowsAndChartToXlsxBlob, safeFileStem, triggerBlobDownload,
 } from '../app/exportUtils';
-import { buildXlsxWithNativeChart } from '../app/xlsxChart';
+import { buildXlsxWorkbook } from '../app/xlsxWorkbook';
+import { ExcelExportDialog, type ExcelExportChoices } from './ExcelExportDialog';
 import embed from 'vega-embed';
 import { Chart, EncodingItem, EncodingMap, FieldItem, FieldSemanticsInfo, FormArtifact, TextTurn, computeInsightKey } from '../components/ComponentType';
 import { ConnectorFormCard } from '../components/ConnectorFormCard';
@@ -970,6 +972,7 @@ export const ChartEditorFC: FC<{}> = function ChartEditorFC({}) {
 
     // ── Chart / table export actions ────────────────────────────────────
     const [exportMenuAnchor, setExportMenuAnchor] = useState<null | HTMLElement>(null);
+    const [exportDialogOpen, setExportDialogOpen] = useState(false);
     const [exportBusy, setExportBusy] = useState(false);
 
     // Prefer the live view (2x scale); fall back to the headless render cache.
@@ -1013,27 +1016,51 @@ export const ChartEditorFC: FC<{}> = function ChartEditorFC({}) {
         triggerBlobDownload(await pngDataUrlToBlob(png), `${exportStem}.png`);
     });
 
-    const handleDownloadXlsx = (withChart: boolean) => runExport(async () => {
+    const sourceTables = useMemo(
+        () => collectSourceTables(table, tables),
+        [table, tables],
+    );
+
+    const handleDownloadXlsx = (choices: ExcelExportChoices) => runExport(async () => {
+        setExportDialogOpen(false);
         const fullRows = await resolveFullTableRows(table.id, table.rows, !!table.virtual, table.virtual?.rowCount);
-        let blob: Blob;
-        if (withChart) {
-            // Prefer a real Excel chart bound to worksheet ranges — it stays
-            // editable and recalculates when its cells change. Chart forms
-            // Excel cannot draw (maps, box plots, ...) fall back to a picture.
-            const nativeSpec = resolveNativeChartSpec(focusedChart, conceptShelfItems, activeVisTableRows);
-            if (nativeSpec) {
-                blob = await buildXlsxWithNativeChart(fullRows, table.names, nativeSpec, 'Data');
-            } else {
-                const png = await getChartPngDataUrl();
-                if (!png) throw new Error(t('chart.noRenderedChart', { defaultValue: 'No rendered chart available' }));
-                blob = await rowsAndChartToXlsxBlob(fullRows, table.names, png, table.displayId || table.id);
-                setSystemMessage(t('chart.chartExportedAsImage', {
-                    defaultValue: 'Excel has no equivalent for this chart type, so it was embedded as an image.',
-                }), 'info');
-            }
-        } else {
-            blob = await rowsToXlsxBlob(fullRows, table.names, table.displayId || table.id);
+
+        // A chart form Excel cannot draw (maps, box plots, ...) has no native
+        // equivalent, so that export falls back to a picture of the chart.
+        const nativeSpec = choices.chart
+            ? resolveNativeChartSpec(focusedChart, conceptShelfItems, activeVisTableRows)
+            : null;
+
+        if (choices.chart && !nativeSpec) {
+            const png = await getChartPngDataUrl();
+            if (!png) throw new Error(t('chart.noRenderedChart', { defaultValue: 'No rendered chart available' }));
+            triggerBlobDownload(
+                await rowsAndChartToXlsxBlob(fullRows, table.names, png, table.displayId || table.id),
+                `${exportStem}.xlsx`,
+            );
+            setSystemMessage(t('chart.chartExportedAsImage', {
+                defaultValue: 'Excel has no equivalent for this chart type, so it was embedded as an image.',
+            }), 'info');
+            return;
         }
+
+        const pivot = choices.pivot
+            ? resolvePivotFields(focusedChart, conceptShelfItems, table.names, fullRows)
+            : null;
+        if (choices.pivot && !pivot) {
+            setSystemMessage(t('chart.pivotNotAvailable', {
+                defaultValue: 'This table has no category/measure pair to pivot on, so no pivot table was added.',
+            }), 'info');
+        }
+
+        const sourceSheets = choices.sourceData ? await buildSourceSheets(sourceTables) : [];
+
+        const blob = await buildXlsxWorkbook({
+            data: { name: 'Data', rows: fullRows, columns: table.names },
+            sourceSheets,
+            chart: nativeSpec ?? undefined,
+            pivot: pivot ?? undefined,
+        });
         triggerBlobDownload(blob, `${exportStem}.xlsx`);
     });
 
@@ -1622,13 +1649,18 @@ export const ChartEditorFC: FC<{}> = function ChartEditorFC({}) {
                             <MenuItem onClick={handleDownloadChartPng}>
                                 {t('chart.downloadPng', { defaultValue: 'Chart image (PNG)' })}
                             </MenuItem>
-                            <MenuItem onClick={() => handleDownloadXlsx(false)}>
-                                {t('chart.downloadXlsxData', { defaultValue: 'Excel — table only (.xlsx)' })}
-                            </MenuItem>
-                            <MenuItem onClick={() => handleDownloadXlsx(true)}>
-                                {t('chart.downloadXlsxDataChart', { defaultValue: 'Excel — table + chart (.xlsx)' })}
+                            <MenuItem onClick={() => { setExportMenuAnchor(null); setExportDialogOpen(true); }}>
+                                {t('chart.downloadExcel', { defaultValue: 'Excel workbook…' })}
                             </MenuItem>
                         </Menu>
+                        <ExcelExportDialog
+                            open={exportDialogOpen}
+                            onClose={() => setExportDialogOpen(false)}
+                            onExport={handleDownloadXlsx}
+                            chartAvailable
+                            sourceTableCount={sourceTables.length}
+                            busy={exportBusy}
+                        />
                     </>
                 )}
                 {/* Edit-chart (encoding shelf) button — opens the encoding shelf
@@ -1713,16 +1745,33 @@ const TableActionDock: FC<{
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const [isDownloading, setIsDownloading] = useState(false);
     const [isDownloadingXlsx, setIsDownloadingXlsx] = useState(false);
+    const [xlsxDialogOpen, setXlsxDialogOpen] = useState(false);
     const open = Boolean(anchorEl);
     // The Quick chart action only renders when a template picker is supplied.
     const showQuickChart = !!chartSelectionBox;
 
-    const handleDownloadXlsx = async () => {
+    const allTables = useSelector(dfSelectors.getAllTables);
+    const sourceTables = useMemo(() => {
+        const self = allTables.find(t => t.id === tableId);
+        return self ? collectSourceTables(self, allTables) : [];
+    }, [allTables, tableId]);
+
+    const handleDownloadXlsx = async (choices: ExcelExportChoices) => {
         if (isDownloadingXlsx) return;
         setIsDownloadingXlsx(true);
+        setXlsxDialogOpen(false);
         try {
             const fullRows = await resolveFullTableRows(tableId, rows, virtual, gridReport?.rowCount);
-            const blob = await rowsToXlsxBlob(fullRows, undefined, tableName);
+            const columns = Object.keys(fullRows[0] ?? {});
+            const pivot = choices.pivot
+                ? resolvePivotFields(undefined, [], columns, fullRows)
+                : null;
+            const sourceSheets = choices.sourceData ? await buildSourceSheets(sourceTables) : [];
+            const blob = await buildXlsxWorkbook({
+                data: { name: 'Data', rows: fullRows, columns },
+                sourceSheets,
+                pivot: pivot ?? undefined,
+            });
             triggerBlobDownload(blob, `${safeFileStem(tableName)}.xlsx`);
         } catch (error) {
             console.error('Error downloading table as xlsx:', error);
@@ -1805,12 +1854,19 @@ const TableActionDock: FC<{
                     size="small"
                     variant="text"
                     startIcon={isDownloadingXlsx ? <CircularProgress size={14} /> : <SaveAltIcon />}
-                    onClick={handleDownloadXlsx}
+                    onClick={() => setXlsxDialogOpen(true)}
                     disabled={isDownloadingXlsx}
                     sx={{ textTransform: 'none', flexShrink: 0, color: 'text.secondary', ...(compact ? { fontSize: textVar.sm } : {}) }}
                 >
                     {t('dataGrid.downloadXlsx', { defaultValue: 'Download Excel' })}
                 </Button>
+                <ExcelExportDialog
+                    open={xlsxDialogOpen}
+                    onClose={() => setXlsxDialogOpen(false)}
+                    onExport={handleDownloadXlsx}
+                    sourceTableCount={sourceTables.length}
+                    busy={isDownloadingXlsx}
+                />
                 <Divider orientation="vertical" flexItem sx={{ mx: 0.5, my: 0.75 }} />
                 <Typography sx={{ fontSize: textVar.sm, color: 'text.secondary', px: 0.5, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' }}>
                     {gridReport?.virtual
