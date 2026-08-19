@@ -53,6 +53,11 @@ import { assembleVegaChart, extractFieldsFromEncodingMap, getUrls, prepVisTable,
 import { displayRowsCache } from '../app/displayRowsCache';
 import { buildEmbeddedDataForChart, applyVariantConfigUI } from '../app/restyle';
 import { apiRequest } from '../app/apiClient';
+import { getCachedChart } from '../app/chartCache';
+import {
+    copyPngDataUrlToClipboard, pngDataUrlToBlob, resolveFullTableRows,
+    rowsAndChartToXlsxBlob, rowsToXlsxBlob, safeFileStem, triggerBlobDownload,
+} from '../app/exportUtils';
 import embed from 'vega-embed';
 import { Chart, EncodingItem, EncodingMap, FieldItem, FieldSemanticsInfo, FormArtifact, TextTurn, computeInsightKey } from '../components/ComponentType';
 import { ConnectorFormCard } from '../components/ConnectorFormCard';
@@ -612,7 +617,9 @@ const VegaChartRenderer: FC<{
     themePreview?: { active: true; themeId: string | undefined };
     fieldSemantics?: Record<string, FieldSemanticsInfo>;
     onSpecReady?: (spec: any | null) => void;
-}> = React.memo(({ chart, conceptShelfItems, visTableRows, tableMetadata, chartWidth, chartHeight, scaleFactor, displayScale = 1, maxStretchFactor, chartUnavailable, insightTitle, insightSubtitle, themePreview, fieldSemantics, onSpecReady }) => {
+    /** Hands the live Vega View up for high-fidelity exports (null on teardown). */
+    onViewReady?: (view: any | null) => void;
+}> = React.memo(({ chart, conceptShelfItems, visTableRows, tableMetadata, chartWidth, chartHeight, scaleFactor, displayScale = 1, maxStretchFactor, chartUnavailable, insightTitle, insightSubtitle, themePreview, fieldSemantics, onSpecReady, onViewReady }) => {
 
     const dispatch = useDispatch();
     const elementId = `focused-chart-element-${chart.id}`;
@@ -735,6 +742,7 @@ const VegaChartRenderer: FC<{
                     return;
                 }
                 embedResult.current = result;
+                onViewReady?.(result.view);
                 // Record Vega's own CSS width before anything rescales it. It
                 // must be read here: Vega writes the width *inline*, so clearing
                 // that style later doesn't reveal a natural size, it removes the
@@ -752,12 +760,13 @@ const VegaChartRenderer: FC<{
 
         return () => {
             cancelled = true;
+            onViewReady?.(null);
             embedResult.current?.finalize();
             embedResult.current = undefined;
             el.innerHTML = '';
         };
 
-    }, [chart.id, chart.chartType, chart.encodingMap, chart.config, chart.themeId, chart.activeVariantId, chart.styleVariants, conceptShelfItems, visTableRows, tableMetadata, chartWidth, chartHeight, scaleFactor, maxStretchFactor, chartUnavailable, insightTitle, insightSubtitle, themePreview?.active, themePreview?.themeId, fieldSemantics, onSpecReady, elementId]);
+    }, [chart.id, chart.chartType, chart.encodingMap, chart.config, chart.themeId, chart.activeVariantId, chart.styleVariants, conceptShelfItems, visTableRows, tableMetadata, chartWidth, chartHeight, scaleFactor, maxStretchFactor, chartUnavailable, insightTitle, insightSubtitle, themePreview?.active, themePreview?.themeId, fieldSemantics, onSpecReady, onViewReady, elementId]);
 
     // Resize the drawn canvas instead of recompiling. Overriding Vega's inline
     // width (with `height: auto` from the wrapper) scales the chart uniformly
@@ -843,6 +852,11 @@ export const ChartEditorFC: FC<{}> = function ChartEditorFC({}) {
     // Track the assembled Vega-Lite spec from the renderer so we can open it in the Vega Editor
     const [renderedSpec, setRenderedSpec] = useState<any | null>(null);
     const handleSpecReady = useCallback((spec: any | null) => { setRenderedSpec(spec); }, []);
+
+    // Live Vega View from the on-screen renderer — the highest-fidelity source
+    // for chart-image exports (matches style variants, theme, current zoom).
+    const vegaViewRef = useRef<any>(null);
+    const handleViewReady = useCallback((view: any | null) => { vegaViewRef.current = view; }, []);
 
     const handleOpenInVegaEditor = useCallback(() => {
         if (!renderedSpec) return;
@@ -980,6 +994,64 @@ export const ChartEditorFC: FC<{}> = function ChartEditorFC({}) {
             "value": content
         }));
     }
+
+    // ── Chart / table export actions ────────────────────────────────────
+    const [exportMenuAnchor, setExportMenuAnchor] = useState<null | HTMLElement>(null);
+    const [exportBusy, setExportBusy] = useState(false);
+
+    // Prefer the live view (2x scale); fall back to the headless render cache.
+    const getChartPngDataUrl = async (): Promise<string | null> => {
+        if (vegaViewRef.current) {
+            try {
+                return await vegaViewRef.current.toImageURL('png', 2);
+            } catch (e) {
+                console.warn('live view export failed, falling back to cache', e);
+            }
+        }
+        return getCachedChart(focusedChart.id)?.fullPngDataUrl ?? null;
+    };
+
+    const exportStem = safeFileStem(focusedChart.title || table.displayId || table.id || 'chart');
+
+    const runExport = async (action: () => Promise<void>) => {
+        if (exportBusy) return;
+        setExportBusy(true);
+        setExportMenuAnchor(null);
+        try {
+            await action();
+        } catch (e: any) {
+            console.error('export failed', e);
+            setSystemMessage(t('chart.exportFailed', { defaultValue: 'Export failed: {{message}}', message: e?.message || String(e) }), 'error');
+        } finally {
+            setExportBusy(false);
+        }
+    };
+
+    const handleCopyChartImage = () => runExport(async () => {
+        const png = await getChartPngDataUrl();
+        if (!png) throw new Error(t('chart.noRenderedChart', { defaultValue: 'No rendered chart available' }));
+        await copyPngDataUrlToClipboard(png);
+        setSystemMessage(t('chart.imageCopied', { defaultValue: 'Chart image copied to clipboard' }), 'success');
+    });
+
+    const handleDownloadChartPng = () => runExport(async () => {
+        const png = await getChartPngDataUrl();
+        if (!png) throw new Error(t('chart.noRenderedChart', { defaultValue: 'No rendered chart available' }));
+        triggerBlobDownload(await pngDataUrlToBlob(png), `${exportStem}.png`);
+    });
+
+    const handleDownloadXlsx = (withChart: boolean) => runExport(async () => {
+        const fullRows = await resolveFullTableRows(table.id, table.rows, !!table.virtual, table.virtual?.rowCount);
+        let blob: Blob;
+        if (withChart) {
+            const png = await getChartPngDataUrl();
+            if (!png) throw new Error(t('chart.noRenderedChart', { defaultValue: 'No rendered chart available' }));
+            blob = await rowsAndChartToXlsxBlob(fullRows, table.names, png, table.displayId || table.id);
+        } else {
+            blob = await rowsToXlsxBlob(fullRows, table.names, table.displayId || table.id);
+        }
+        triggerBlobDownload(blob, `${exportStem}.xlsx`);
+    });
 
     let createVisTableRowsLocal = (rows: any[]) => {
         if (visFields.length == 0) {
@@ -1261,6 +1333,7 @@ export const ChartEditorFC: FC<{}> = function ChartEditorFC({}) {
                                         themePreview={themePreview}
                                         fieldSemantics={tableSemantics.find(info => info.tableId === table.id)?.fields}
                                         onSpecReady={handleSpecReady}
+                                        onViewReady={handleViewReady}
                                     />
                                 </Box>
                                 {/* Quick chart-config controls (toggles/sliders/selects) for
@@ -1554,6 +1627,52 @@ export const ChartEditorFC: FC<{}> = function ChartEditorFC({}) {
                         </IconButton>
                     </Tooltip>
                 )}
+                {/* Copy chart image + export menu — chart-image actions only
+                    make sense for a rendered vega chart, so Table/Auto and
+                    unavailable charts hide them. */}
+                {focusedChart && focusedChart.chartType !== 'Table' && focusedChart.chartType !== 'Auto' && !chartUnavailable && (
+                    <>
+                        <Tooltip title={t('chart.copyImage', { defaultValue: 'Copy chart image' })} placement="bottom">
+                            <span>
+                                <IconButton
+                                    size="small"
+                                    disabled={exportBusy}
+                                    onClick={handleCopyChartImage}
+                                    sx={floatingPillSx}>
+                                    <ContentCopyIcon sx={{ fontSize: iconVar.lg }} />
+                                </IconButton>
+                            </span>
+                        </Tooltip>
+                        <Tooltip title={t('chart.download', { defaultValue: 'Download' })} placement="bottom">
+                            <span>
+                                <IconButton
+                                    size="small"
+                                    disabled={exportBusy}
+                                    onClick={(e) => setExportMenuAnchor(e.currentTarget)}
+                                    sx={floatingPillSx}>
+                                    {exportBusy
+                                        ? <CircularProgress size={iconVar.lg} sx={{ color: 'inherit' }} />
+                                        : <SaveAltIcon sx={{ fontSize: iconVar.lg }} />}
+                                </IconButton>
+                            </span>
+                        </Tooltip>
+                        <Menu
+                            anchorEl={exportMenuAnchor}
+                            open={Boolean(exportMenuAnchor)}
+                            onClose={() => setExportMenuAnchor(null)}
+                        >
+                            <MenuItem onClick={handleDownloadChartPng}>
+                                {t('chart.downloadPng', { defaultValue: 'Chart image (PNG)' })}
+                            </MenuItem>
+                            <MenuItem onClick={() => handleDownloadXlsx(false)}>
+                                {t('chart.downloadXlsxData', { defaultValue: 'Excel — table only (.xlsx)' })}
+                            </MenuItem>
+                            <MenuItem onClick={() => handleDownloadXlsx(true)}>
+                                {t('chart.downloadXlsxDataChart', { defaultValue: 'Excel — table + chart (.xlsx)' })}
+                            </MenuItem>
+                        </Menu>
+                    </>
+                )}
                 {/* Edit-chart (encoding shelf) button — opens the encoding shelf
                     popover; stays available even when the chart can't render yet,
                     so users can fix the encoding. */}
@@ -1635,9 +1754,24 @@ const TableActionDock: FC<{
     const { t } = useTranslation();
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const [isDownloading, setIsDownloading] = useState(false);
+    const [isDownloadingXlsx, setIsDownloadingXlsx] = useState(false);
     const open = Boolean(anchorEl);
     // The Quick chart action only renders when a template picker is supplied.
     const showQuickChart = !!chartSelectionBox;
+
+    const handleDownloadXlsx = async () => {
+        if (isDownloadingXlsx) return;
+        setIsDownloadingXlsx(true);
+        try {
+            const fullRows = await resolveFullTableRows(tableId, rows, virtual, gridReport?.rowCount);
+            const blob = await rowsToXlsxBlob(fullRows, undefined, tableName);
+            triggerBlobDownload(blob, `${safeFileStem(tableName)}.xlsx`);
+        } catch (error) {
+            console.error('Error downloading table as xlsx:', error);
+        } finally {
+            setIsDownloadingXlsx(false);
+        }
+    };
 
     const handleDownload = async () => {
         if (isDownloading) return;
@@ -1708,6 +1842,16 @@ const TableActionDock: FC<{
                     sx={{ textTransform: 'none', flexShrink: 0, color: 'text.secondary', ...(compact ? { fontSize: textVar.sm } : {}) }}
                 >
                     {t('dataGrid.downloadCsv', { defaultValue: 'Download CSV' })}
+                </Button>
+                <Button
+                    size="small"
+                    variant="text"
+                    startIcon={isDownloadingXlsx ? <CircularProgress size={14} /> : <SaveAltIcon />}
+                    onClick={handleDownloadXlsx}
+                    disabled={isDownloadingXlsx}
+                    sx={{ textTransform: 'none', flexShrink: 0, color: 'text.secondary', ...(compact ? { fontSize: textVar.sm } : {}) }}
+                >
+                    {t('dataGrid.downloadXlsx', { defaultValue: 'Download Excel' })}
                 </Button>
                 <Divider orientation="vertical" flexItem sx={{ mx: 0.5, my: 0.75 }} />
                 <Typography sx={{ fontSize: textVar.sm, color: 'text.secondary', px: 0.5, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' }}>

@@ -34,6 +34,8 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import { getUrls, fetchWithIdentity } from '../app/utils';
 import { apiRequest, assertDownloadResponseOk } from '../app/apiClient';
+import GridOnIcon from '@mui/icons-material/GridOn';
+import { resolveFullTableRows, rowsToXlsxBlob, safeFileStem, triggerBlobDownload } from '../app/exportUtils';
 import { useDrag } from 'react-dnd';
 import { useSelector } from 'react-redux';
 import { DataFormulatorState, dfSelectors } from '../app/dfSlice';
@@ -463,7 +465,7 @@ export const SelectableDataGrid: React.FC<SelectableDataGridProps> = React.memo(
         TableBody: VirtuosoTableBody,
     }), [VirtuosoTable]);
 
-    const handleDownload = async (format: 'csv' | 'tsv') => {
+    const handleDownload = async (format: 'csv' | 'tsv' | 'xlsx') => {
         if (isDownloading) return;
         const delimiter = format === 'tsv' ? '\t' : ',';
         const ext = format === 'tsv' ? 'tsv' : 'csv';
@@ -471,7 +473,11 @@ export const SelectableDataGrid: React.FC<SelectableDataGridProps> = React.memo(
 
         setIsDownloading(true);
         try {
-            if (virtual) {
+            if (format === 'xlsx') {
+                const fullRows = await resolveFullTableRows(tableId, rows, virtual, virtual ? serverRowCount : rows.length);
+                const blob = await rowsToXlsxBlob(fullRows, undefined, tableName);
+                triggerBlobDownload(blob, `${safeFileStem(tableName)}.xlsx`);
+            } else if (virtual) {
                 const response = await fetchWithIdentity(getUrls().EXPORT_TABLE_CSV, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -792,17 +798,30 @@ export const SelectableDataGrid: React.FC<SelectableDataGridProps> = React.memo(
                     )}
                     <Tooltip title={isDownloading ? t('dataGrid.downloading') : t('dataGrid.downloadAsCsv')}>
                         <span>
-                            <IconButton 
-                                size="small" 
-                                color="primary" 
+                            <IconButton
+                                size="small"
+                                color="primary"
                                 aria-label={t('dataGrid.downloadAsCsv')}
                                 disabled={isDownloading}
                                 onClick={() => handleDownload('csv')}
                             >
-                                {isDownloading 
+                                {isDownloading
                                     ? <CircularProgress size={16} sx={{ color: 'inherit' }} />
                                     : <FileDownloadIcon sx={{ fontSize: iconVar.lg }} />
                                 }
+                            </IconButton>
+                        </span>
+                    </Tooltip>
+                    <Tooltip title={isDownloading ? t('dataGrid.downloading') : t('dataGrid.downloadAsXlsx', { defaultValue: 'Download as Excel (.xlsx)' })}>
+                        <span>
+                            <IconButton
+                                size="small"
+                                color="primary"
+                                aria-label={t('dataGrid.downloadAsXlsx', { defaultValue: 'Download as Excel (.xlsx)' })}
+                                disabled={isDownloading}
+                                onClick={() => handleDownload('xlsx')}
+                            >
+                                <GridOnIcon sx={{ fontSize: iconVar.lg }} />
                             </IconButton>
                         </span>
                     </Tooltip>
