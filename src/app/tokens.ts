@@ -147,6 +147,17 @@ export interface AppPalette {
 }
 
 export const palettes: Record<string, AppPalette> = {
+    /** Gold — warm brand gold with cool blue counterpart
+     *  Primary/Custom: complementary pair (gold 43° ↔ blue 218°) */
+    gold: {
+        name: 'Gold',
+        primary:   { main: '#e3af32', bgcolor: '#faf3dd', textColor: '#8a6a12' },   // brand gold — darkened for text
+        secondary: { main: '#4f8ff7', textColor: '#2f6fd6' },   // sky blue — darkened for text
+        derived:   { main: '#35b57c', textColor: '#1f8a5c' },   // emerald — darkened for text
+        custom:    { main: '#b06ee8', textColor: '#8a46c8' },    // violet — darkened for text
+        warning:   { main: '#c8102e' },   // deep red
+    },
+
     /** Default Material UI inspired palette
      *  Primary/Custom: split-complementary pair (blue 215° ↔ orange 25°) */
     material: {
@@ -259,7 +270,7 @@ export const palettes: Record<string, AppPalette> = {
 } as const;
 
 /** Default palette key (used when no user preference is stored). */
-export const defaultPaletteKey: keyof typeof palettes = 'fluent';
+export const defaultPaletteKey: keyof typeof palettes = 'gold';
 
 /** List of palette keys in display order */
 export const paletteKeys = Object.keys(palettes) as (keyof typeof palettes)[];

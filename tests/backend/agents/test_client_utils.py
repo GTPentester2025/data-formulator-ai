@@ -496,3 +496,53 @@ class TestMatchToolWireFormats:
         name, args = _match_tool_from_obj(obj, _core_action_tools())
         assert name == "execute_python_script"
         assert args["code"] == "print(1)"
+
+
+# ---------------------------------------------------------------------------
+# Custom OpenAI-compatible endpoint
+# ---------------------------------------------------------------------------
+
+class TestCustomEndpoint:
+    def test_custom_routes_through_openai_provider(self):
+        c = Client("custom", "my-deployment", api_key="k",
+                   api_base="https://res.openai.azure.com/openai/v1")
+        assert c.model == "openai/my-deployment"
+        assert c.params["api_base"] == "https://res.openai.azure.com/openai/v1"
+
+    def test_custom_requires_api_base(self):
+        with pytest.raises(ValueError):
+            Client("custom", "my-model", api_key="k")
+
+    def test_custom_placeholder_key_when_missing(self):
+        c = Client("custom", "local-model", api_base="http://localhost:1234/v1")
+        assert c.params["api_key"] == "not-needed"
+
+    def test_custom_keeps_provided_key(self):
+        c = Client("custom", "m", api_key="sk-x", api_base="http://h/v1")
+        assert c.params["api_key"] == "sk-x"
+
+
+class TestOpenAICompatibleBaseNormalization:
+    norm = staticmethod(client_utils.normalize_openai_compatible_base)
+
+    def test_appends_v1_to_bare_host(self):
+        assert self.norm("https://api.groq.com/openai") == "https://api.groq.com/openai/v1"
+
+    def test_strips_chat_completions_suffix(self):
+        assert self.norm("https://h/v1/chat/completions") == "https://h/v1"
+
+    def test_strips_trailing_slash(self):
+        assert self.norm("https://h/v1/") == "https://h/v1"
+
+    def test_keeps_existing_version_segment(self):
+        assert self.norm("https://res.openai.azure.com/openai/v1") == \
+            "https://res.openai.azure.com/openai/v1"
+
+    def test_openai_endpoint_normalizes_api_base(self):
+        c = Client("openai", "gpt-4o", api_key="k",
+                   api_base="https://h/v1/chat/completions")
+        assert c.params["api_base"] == "https://h/v1"
+
+    def test_openai_endpoint_without_api_base_unchanged(self):
+        c = Client("openai", "gpt-4o", api_key="k")
+        assert "api_base" not in c.params

@@ -109,7 +109,8 @@ export const ModelSelectionButton: React.FC<ModelSelectionButtonProps> = ({ appe
         'azure': [],
         'anthropic': [],
         'gemini': [],
-        'ollama': []
+        'ollama': [],
+        'custom': []
     });
     const serverConfig = useSelector((state: DataFormulatorState) => state.serverConfig);
 
@@ -223,7 +224,8 @@ export const ModelSelectionButton: React.FC<ModelSelectionButtonProps> = ({ appe
             'azure': [],
             'anthropic': [],
             'gemini': [],
-            'ollama': []
+            'ollama': [],
+            'custom': []
         };
 
         globalModels.forEach((modelConfig: any) => {
@@ -436,8 +438,8 @@ export const ModelSelectionButton: React.FC<ModelSelectionButtonProps> = ({ appe
                     setNewModelDiagnostic(null);
                 }}
             >
-                {['openai', 'azure', 'ollama', 'anthropic', 'gemini'].map(provider => (
-                    <MenuItem key={provider} value={provider}>{provider}</MenuItem>
+                {['openai', 'azure', 'ollama', 'anthropic', 'gemini', 'custom'].map(provider => (
+                    <MenuItem key={provider} value={provider}>{provider === 'custom' ? 'custom (OpenAI-compatible)' : provider}</MenuItem>
                 ))}
             </TextField>
 
@@ -520,7 +522,9 @@ export const ModelSelectionButton: React.FC<ModelSelectionButtonProps> = ({ appe
                     label={newEndpoint === 'azure' ? t('model.endpoint') : t('model.apiBase')}
                     value={newApiBase}
                     onChange={(event) => setNewApiBase(event.target.value)}
-                    placeholder={newEndpoint === 'ollama' ? 'http://localhost:11434' : undefined}
+                    placeholder={newEndpoint === 'ollama' ? 'http://localhost:11434'
+                        : newEndpoint === 'custom' ? 'https://<resource>.openai.azure.com/openai/v1'
+                        : undefined}
                     autoComplete="off"
                 />
             )}

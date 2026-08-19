@@ -1,7 +1,37 @@
 import json
+import re
+
 import litellm
 import os
 from types import SimpleNamespace
+
+
+def normalize_openai_compatible_base(api_base: str) -> str:
+    """Normalize a user-supplied OpenAI-compatible base URL.
+
+    Users paste URLs in many shapes — with a trailing ``/chat/completions``
+    (copied from docs), with or without ``/v1``, with trailing slashes.
+    The OpenAI client appends ``/chat/completions`` itself, so:
+
+    * strip trailing slashes and a trailing ``/chat/completions`` or
+      ``/completions`` path;
+    * append ``/v1`` when the URL has no version segment at the end
+      (covers hosts pasted bare, e.g. ``https://api.groq.com/openai``),
+      leaving URLs that already end in ``/v1``/``/v2``... untouched.
+
+    Works for Azure AI Foundry (``https://<res>.openai.azure.com/openai/v1``),
+    Ollama (``http://localhost:11434/v1``), Groq, OpenRouter, LM Studio,
+    vLLM, LiteLLM proxies.
+    """
+    base = api_base.strip().rstrip("/")
+    for suffix in ("/chat/completions", "/completions"):
+        if base.endswith(suffix):
+            base = base[: -len(suffix)]
+            base = base.rstrip("/")
+            break
+    if not re.search(r"/v\d+$", base):
+        base = base + "/v1"
+    return base
 
 from azure.identity import AzureCliCredential, DefaultAzureCredential, get_bearer_token_provider
 
@@ -237,6 +267,23 @@ class Client(object):
         if self.endpoint == "openai":
             if not model.startswith("openai/"):
                 self.model = f"openai/{model}"
+            if self.params.get("api_base"):
+                self.params["api_base"] = normalize_openai_compatible_base(
+                    self.params["api_base"])
+        elif self.endpoint == "custom":
+            # Any OpenAI-compatible endpoint (Azure AI Foundry, Groq,
+            # OpenRouter, LM Studio, vLLM, LiteLLM proxy, ...). Routed
+            # through LiteLLM's openai provider with a custom api_base.
+            if not api_base:
+                raise ValueError(
+                    "Custom provider requires an API base URL "
+                    "(e.g. https://<resource>.openai.azure.com/openai/v1)")
+            self.model = model if model.startswith("openai/") else f"openai/{model}"
+            self.params["api_base"] = normalize_openai_compatible_base(api_base)
+            if not self.params.get("api_key"):
+                # Some local OpenAI-compatible servers reject a missing key
+                # header outright; send a placeholder like other tools do.
+                self.params["api_key"] = "not-needed"
         elif self.endpoint == "gemini":
             if model.startswith("gemini/"):
                 self.model = model
