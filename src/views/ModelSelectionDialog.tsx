@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import '../scss/App.scss';
 
 import { useDispatch, useSelector } from "react-redux";
@@ -54,12 +54,13 @@ import ContentCopyOutlinedIcon from '@mui/icons-material/ContentCopyOutlined';
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import TerminalOutlinedIcon from '@mui/icons-material/TerminalOutlined';
+import DownloadIcon from '@mui/icons-material/Download';
 
 import { getUrls } from '../app/utils';
 import { apiRequest, ApiError, ApiRequestError } from '../app/apiClient';
 import { useTranslation } from 'react-i18next';
 import { LogViewerDialog } from './LogViewerDialog';
-import { iconVar } from '../app/layout';
+import { iconVar, textVar } from '../app/layout';
 
 
 // Add this helper function at the top of the file, after the imports
@@ -109,6 +110,12 @@ export const ModelSelectionButton: React.FC<ModelSelectionButtonProps> = ({ appe
         'ollama': [],
         'custom': []
     });
+    // Models fetched live from the endpoint the user is configuring, keyed by
+    // provider so switching provider doesn't show the previous one's list.
+    const [fetchedModels, setFetchedModels] = useState<{[key: string]: string[]}>({});
+    const [loadingProviderModels, setLoadingProviderModels] = useState(false);
+    const [providerModelsMessage, setProviderModelsMessage] = useState<string>("");
+    const [providerModelsError, setProviderModelsError] = useState(false);
     const serverConfig = useSelector((state: DataFormulatorState) => state.serverConfig);
 
     let updateModelStatus = (model: ModelConfig, status: 'ok' | 'error' | 'testing' | 'unknown', message: string) => {
@@ -276,6 +283,47 @@ export const ModelSelectionButton: React.FC<ModelSelectionButtonProps> = ({ appe
             });
     }
 
+    // Whatever the endpoint just told us, plus models already configured for
+    // this provider, so both sources are offered in one list.
+    const modelOptionsForEndpoint = useMemo(() => {
+        const live = fetchedModels[newEndpoint] || [];
+        const known = providerModelOptions[newEndpoint] || [];
+        return Array.from(new Set([...live, ...known]));
+    }, [fetchedModels, providerModelOptions, newEndpoint]);
+
+    const handleLoadProviderModels = () => {
+        if (loadingProviderModels || !newEndpoint) return;
+        setLoadingProviderModels(true);
+        setProviderModelsMessage("");
+        setProviderModelsError(false);
+
+        apiRequest<{ models: string[] }>(getUrls().LIST_PROVIDER_MODELS, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: {
+                    endpoint: newEndpoint,
+                    api_key: newApiKey,
+                    api_base: newApiBase,
+                    api_version: newApiVersion,
+                },
+            }),
+        }).then(({ data }) => {
+            const models = data.models || [];
+            setFetchedModels(prev => ({ ...prev, [newEndpoint]: models }));
+            setProviderModelsMessage(t('model.loadModelsFound', {
+                defaultValue: '{{count}} models available — pick one from the list.',
+                count: models.length,
+            }));
+        }).catch((error) => {
+            const msg = error instanceof ApiRequestError ? error.apiError.message : error.message;
+            setProviderModelsError(true);
+            setProviderModelsMessage(msg);
+        }).finally(() => {
+            setLoadingProviderModels(false);
+        });
+    };
+
     let readyToTest = newModel && (newApiKey || newApiBase) && !isAddingModel;
 
     const resetNewModelForm = () => {
@@ -440,16 +488,52 @@ export const ModelSelectionButton: React.FC<ModelSelectionButtonProps> = ({ appe
                 ))}
             </TextField>
 
-            <TextField
-                fullWidth
-                size="small"
-                disabled={!isEditingDetails}
-                label={newEndpoint === 'azure' ? t('model.deploymentName') : t('model.model')}
-                value={newModel}
-                onChange={(event) => setNewModel(event.target.value)}
-                placeholder={t('model.modelPlaceholder')}
-                autoComplete="off"
-            />
+            {/* Model picker: type an id, or pull the list from the endpoint.
+                Kept free-solo so a model the provider doesn't advertise (a
+                private deployment, a brand-new release) can still be entered. */}
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                <Autocomplete
+                    freeSolo
+                    fullWidth
+                    size="small"
+                    disabled={!isEditingDetails}
+                    options={modelOptionsForEndpoint}
+                    value={newModel}
+                    inputValue={newModel}
+                    onInputChange={(_event, value) => setNewModel(value)}
+                    renderInput={(params) => (
+                        <TextField
+                            {...params}
+                            label={newEndpoint === 'azure' ? t('model.deploymentName') : t('model.model')}
+                            placeholder={t('model.modelPlaceholder')}
+                            autoComplete="off"
+                        />
+                    )}
+                />
+                <Tooltip title={t('model.loadModelsHint', {
+                    defaultValue: 'Fetch the models this endpoint offers',
+                })}>
+                    <span>
+                        <Button
+                            size="small"
+                            variant="outlined"
+                            disabled={!isEditingDetails || !newEndpoint || loadingProviderModels}
+                            onClick={handleLoadProviderModels}
+                            startIcon={loadingProviderModels
+                                ? <CircularProgress size={iconVar.sm} />
+                                : <DownloadIcon sx={{ fontSize: iconVar.md }} />}
+                            sx={{ textTransform: 'none', whiteSpace: 'nowrap', mt: 0.25 }}
+                        >
+                            {t('model.loadModels', { defaultValue: 'Load models' })}
+                        </Button>
+                    </span>
+                </Tooltip>
+            </Box>
+            {providerModelsMessage && (
+                <Typography sx={{ fontSize: textVar.sm, color: providerModelsError ? 'error.main' : 'text.secondary', mt: -0.5 }}>
+                    {providerModelsMessage}
+                </Typography>
+            )}
 
             {newEndpoint === 'azure' && (
                 <ToggleButtonGroup

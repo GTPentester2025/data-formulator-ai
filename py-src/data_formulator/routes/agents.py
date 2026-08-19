@@ -315,6 +315,129 @@ def check_available_models():
 
     return json_ok(results)
 
+def _parse_model_list(payload) -> list[str]:
+    """Pull model ids out of the several shapes providers return.
+
+    OpenAI-compatible servers answer ``{"data": [{"id": ...}]}``, Ollama
+    answers ``{"models": [{"name": ...}]}``, and some proxies simply return a
+    bare array of ids or objects.
+    """
+    if isinstance(payload, dict):
+        entries = payload.get("data")
+        if not isinstance(entries, list):
+            entries = payload.get("models")
+        if not isinstance(entries, list):
+            entries = []
+    elif isinstance(payload, list):
+        entries = payload
+    else:
+        entries = []
+
+    names = []
+    for entry in entries:
+        if isinstance(entry, str):
+            name = entry
+        elif isinstance(entry, dict):
+            name = entry.get("id") or entry.get("name") or entry.get("model")
+        else:
+            name = None
+        if name and isinstance(name, str):
+            names.append(name.strip())
+
+    return sorted({n for n in names if n})
+
+
+def _model_list_requests(endpoint: str, api_key: str, api_base: str,
+                         api_version: str) -> list[tuple[str, dict]]:
+    """Candidate (url, headers) pairs to try, best first, for *endpoint*."""
+    from data_formulator.agents.client_utils import normalize_openai_compatible_base
+
+    if endpoint in ("openai", "custom"):
+        base = normalize_openai_compatible_base(api_base) if api_base else "https://api.openai.com/v1"
+        # Azure-style gateways read `api-key`; everything else reads Bearer.
+        headers = {"Authorization": f"Bearer {api_key}", "api-key": api_key}
+        return [(f"{base}/models", headers)]
+
+    if endpoint == "ollama":
+        base = (api_base or "http://localhost:11434").rstrip("/")
+        if base.endswith("/api"):
+            base = base[: -len("/api")]
+        if base.endswith("/v1"):
+            base = base[: -len("/v1")]
+        return [(f"{base}/api/tags", {}), (f"{base}/v1/models", {})]
+
+    if endpoint == "anthropic":
+        return [("https://api.anthropic.com/v1/models",
+                 {"x-api-key": api_key, "anthropic-version": "2023-06-01"})]
+
+    if endpoint == "gemini":
+        return [(f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}", {})]
+
+    if endpoint == "azure":
+        if not api_base:
+            raise AppError(ErrorCode.INVALID_REQUEST,
+                           "Azure requires an endpoint URL before models can be listed")
+        base = api_base.rstrip("/")
+        version = api_version or "2024-10-21"
+        return [(f"{base}/openai/models?api-version={version}", {"api-key": api_key}),
+                (f"{base}/models?api-version={version}", {"api-key": api_key})]
+
+    raise AppError(ErrorCode.INVALID_REQUEST,
+                   f"Listing models is not supported for provider '{endpoint}'")
+
+
+@agent_bp.route('/list-provider-models', methods=['POST'])
+def list_provider_models():
+    """Ask a provider which models it offers, so the UI can present a picker
+    instead of asking the user to type an exact model id.
+
+    The credentials arrive in the request body and are used for this call
+    only — nothing is stored server-side.
+    """
+    if not request.is_json:
+        raise AppError(ErrorCode.INVALID_REQUEST, "Invalid request format")
+
+    content = request.get_json() or {}
+    cfg = content.get('model') or {}
+    endpoint = str(cfg.get('endpoint') or '').strip().lower()
+    api_key = str(cfg.get('api_key') or '').strip()
+    api_base = str(cfg.get('api_base') or '').strip()
+    api_version = str(cfg.get('api_version') or '').strip()
+
+    if not endpoint:
+        raise AppError(ErrorCode.INVALID_REQUEST, "Select a provider first")
+
+    # The base URL is caller-supplied, so it goes through the same SSRF
+    # allowlist that guards model calls.
+    from data_formulator.security.url_allowlist import validate_api_base
+    try:
+        validate_api_base(api_base)
+    except ValueError as e:
+        raise AppError(ErrorCode.INVALID_REQUEST, str(e)) from e
+
+    import httpx
+
+    attempts = _model_list_requests(endpoint, api_key, api_base, api_version)
+    last_error = None
+    for url, headers in attempts:
+        try:
+            response = httpx.get(url, headers=headers, timeout=15)
+            response.raise_for_status()
+            models = _parse_model_list(response.json())
+            if models:
+                logger.info("[list-provider-models] %s returned %d models", endpoint, len(models))
+                return json_ok({"models": models})
+            last_error = "The provider returned an empty model list"
+        except Exception as e:      # try the next candidate URL
+            last_error = sanitize_error_message(str(e))
+            logger.info("[list-provider-models] %s failed: %s", url, last_error)
+
+    raise AppError(
+        ErrorCode.AGENT_ERROR,
+        f"Could not list models from this endpoint. {last_error or ''}".strip(),
+    )
+
+
 @agent_bp.route('/test-model', methods=['GET', 'POST'])
 def test_model():
     if not request.is_json:
