@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Security tests for Workspace path traversal checks (FINDING-4)."""
 
 from __future__ import annotations

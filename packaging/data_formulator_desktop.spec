@@ -144,6 +144,6 @@ if sys.platform == "darwin":
     app = BUNDLE(
         coll,
         name="Data Formulator.app",
-        bundle_identifier="com.microsoft.data-formulator",
+        bundle_identifier="com.dataformulator.app",
         icon=str(icon_path),
     )

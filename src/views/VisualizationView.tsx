@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
@@ -56,9 +53,10 @@ import { apiRequest } from '../app/apiClient';
 import { getCachedChart } from '../app/chartCache';
 import { localizeGeoUrls } from '../app/geoAssets';
 import {
-    copyPngDataUrlToClipboard, pngDataUrlToBlob, resolveFullTableRows,
+    copyPngDataUrlToClipboard, pngDataUrlToBlob, resolveFullTableRows, resolveNativeChartSpec,
     rowsAndChartToXlsxBlob, rowsToXlsxBlob, safeFileStem, triggerBlobDownload,
 } from '../app/exportUtils';
+import { buildXlsxWithNativeChart } from '../app/xlsxChart';
 import embed from 'vega-embed';
 import { Chart, EncodingItem, EncodingMap, FieldItem, FieldSemanticsInfo, FormArtifact, TextTurn, computeInsightKey } from '../components/ComponentType';
 import { ConnectorFormCard } from '../components/ConnectorFormCard';
@@ -71,7 +69,6 @@ import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import ZoomOutIcon from '@mui/icons-material/ZoomOut';
 import CasinoIcon from '@mui/icons-material/Casino';
 import SaveAltIcon from '@mui/icons-material/SaveAlt';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import CloseIcon from '@mui/icons-material/Close';
 import AddchartIcon from '@mui/icons-material/Addchart';
 import * as d3dsv from 'd3-dsv';
@@ -859,31 +856,6 @@ export const ChartEditorFC: FC<{}> = function ChartEditorFC({}) {
     const vegaViewRef = useRef<any>(null);
     const handleViewReady = useCallback((view: any | null) => { vegaViewRef.current = view; }, []);
 
-    const handleOpenInVegaEditor = useCallback(() => {
-        if (!renderedSpec) return;
-        const editorUrl = 'https://vega.github.io/editor/';
-        const editor = window.open(editorUrl);
-        if (!editor) return;
-        const wait = 10_000;
-        const step = 250;
-        const { origin } = new URL(editorUrl);
-        let count = Math.floor(wait / step);
-        function listen(evt: MessageEvent) {
-            if (evt.source === editor) {
-                count = 0;
-                window.removeEventListener('message', listen, false);
-            }
-        }
-        window.addEventListener('message', listen, false);
-        function send() {
-            if (count <= 0) return;
-            editor!.postMessage({ spec: JSON.stringify(renderedSpec, null, 2), mode: 'vega-lite' }, origin);
-            setTimeout(send, step);
-            count -= 1;
-        }
-        setTimeout(send, step);
-    }, [renderedSpec]);
-
     let focusedChart = charts.find(c => c.id == focusedChartId) as Chart;
     let trigger = focusedChart.source == "trigger" ? tables.find(t => t.derive?.trigger?.chart?.id == focusedChartId)?.derive?.trigger : undefined;
 
@@ -1045,9 +1017,20 @@ export const ChartEditorFC: FC<{}> = function ChartEditorFC({}) {
         const fullRows = await resolveFullTableRows(table.id, table.rows, !!table.virtual, table.virtual?.rowCount);
         let blob: Blob;
         if (withChart) {
-            const png = await getChartPngDataUrl();
-            if (!png) throw new Error(t('chart.noRenderedChart', { defaultValue: 'No rendered chart available' }));
-            blob = await rowsAndChartToXlsxBlob(fullRows, table.names, png, table.displayId || table.id);
+            // Prefer a real Excel chart bound to worksheet ranges — it stays
+            // editable and recalculates when its cells change. Chart forms
+            // Excel cannot draw (maps, box plots, ...) fall back to a picture.
+            const nativeSpec = resolveNativeChartSpec(focusedChart, conceptShelfItems, activeVisTableRows);
+            if (nativeSpec) {
+                blob = await buildXlsxWithNativeChart(fullRows, table.names, nativeSpec, 'Data');
+            } else {
+                const png = await getChartPngDataUrl();
+                if (!png) throw new Error(t('chart.noRenderedChart', { defaultValue: 'No rendered chart available' }));
+                blob = await rowsAndChartToXlsxBlob(fullRows, table.names, png, table.displayId || table.id);
+                setSystemMessage(t('chart.chartExportedAsImage', {
+                    defaultValue: 'Excel has no equivalent for this chart type, so it was embedded as an image.',
+                }), 'info');
+            }
         } else {
             blob = await rowsToXlsxBlob(fullRows, table.names, table.displayId || table.id);
         }
@@ -1235,19 +1218,6 @@ export const ChartEditorFC: FC<{}> = function ChartEditorFC({}) {
     const availableConcepts = extractConceptExplanations(table);
     const hasConcepts = availableConcepts.length > 0;
     const hasDerived = !!(triggerTable?.derive || table.derive);
-
-    let vegaEditorButton = (
-        <Tooltip key="vega-editor-tooltip" title={t('chart.openInVegaEditor')}>
-            <span>
-                <IconButton key="vega-editor-btn" size="small" sx={actionBtnSx}
-                    aria-label={t('chart.openInVegaEditor')}
-                    disabled={!renderedSpec || focusedChart.chartType === "Table" || focusedChart.chartType === "Auto"}
-                    onClick={handleOpenInVegaEditor}>
-                    <OpenInNewIcon sx={{ fontSize: iconVar.lg }} />
-                </IconButton>
-            </span>
-        </Tooltip>
-    );
 
     let chartMessage = "";
     if (focusedChart.chartType == "Table") {
@@ -1497,19 +1467,6 @@ export const ChartEditorFC: FC<{}> = function ChartEditorFC({}) {
                     sx={{ width: 280, maxHeight: '78vh', overflowY: 'auto', mt: 0.5, py: 0.5, borderRadius: '10px', overflowX: 'visible' }}
                 >
                     <EncodingShelfCard chartId={focusedChart.id} />
-                    {/* Footer: low-emphasis link to inspect the assembled
-                        Vega-Lite spec in the external Vega editor. */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', px: 1.5, pb: 1 }}>
-                        <Button
-                            size="small"
-                            startIcon={<OpenInNewIcon sx={{ fontSize: iconVar.sm }} />}
-                            disabled={!renderedSpec || focusedChart.chartType === "Table" || focusedChart.chartType === "Auto"}
-                            onClick={handleOpenInVegaEditor}
-                            sx={{ textTransform: 'none', fontSize: '0.65rem', color: 'text.disabled', minWidth: 'auto', py: 0, '&:hover': { color: 'text.secondary', backgroundColor: 'transparent' } }}
-                        >
-                            {t('chart.openInVegaEditor')}
-                        </Button>
-                    </Box>
                 </Paper>
             </ClickAwayListener>
         </Popper>

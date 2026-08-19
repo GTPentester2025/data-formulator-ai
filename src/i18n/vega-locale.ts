@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 /**
  * Synchronise Vega's time-format locale with the current i18n language.
  *

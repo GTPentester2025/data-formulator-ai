@@ -1,5 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
 """Minimal startup spinner.
 
 Animates a single line on a TTY while a slow import / setup step runs.

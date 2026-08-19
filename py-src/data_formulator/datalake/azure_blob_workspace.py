@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """
 Azure Blob Storage–backed workspace for the Data Lake.
 

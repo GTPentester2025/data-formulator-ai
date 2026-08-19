@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 import { FC, useRef, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next';
 import { radius } from '../app/tokens';

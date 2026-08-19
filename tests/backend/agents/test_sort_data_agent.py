@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Unit tests for SortDataAgent.
 
 Focuses on things we can test without a real LLM:

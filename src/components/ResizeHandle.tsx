@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 /**
  * ResizeHandle — a draggable edge that lets users resize a panel.
  *

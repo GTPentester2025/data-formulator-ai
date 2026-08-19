@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Tests for the unified error types (errors.py).
 
 Verifies that AppError carries structured error information (code, message,

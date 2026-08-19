@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Security tests for agent tool path confinement (_tool_read_file, etc.)."""
 
 from __future__ import annotations

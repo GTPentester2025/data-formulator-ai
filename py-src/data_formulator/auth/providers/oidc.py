@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """OIDC / OAuth2 authentication provider.
 
 Supports both standards-compliant OIDC Identity Providers (with auto-discovery)

@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Tests for the /api/knowledge/* REST endpoints.
 
 Covers list, read, write, delete, search — including validation errors,

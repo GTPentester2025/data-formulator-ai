@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Local folder data loader — reads data files from a directory on the local filesystem.
 
 Only available in local deployment mode (backend bound to localhost).

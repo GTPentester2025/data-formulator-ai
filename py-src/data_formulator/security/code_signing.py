@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """HMAC-based code signing for transformation code.
 
 When the agent generates Python transformation code and the server

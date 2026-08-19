@@ -1,12 +1,8 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 import { Box, Typography, Button, useTheme, alpha, Divider } from "@mui/material";
 import { borderColor, radius } from '../app/tokens';
 import { textVar } from '../app/layout';
 import React, { FC } from "react";
 import GridViewIcon from '@mui/icons-material/GridView';
-import GitHubIcon from '@mui/icons-material/GitHub';
 import YouTubeIcon from '@mui/icons-material/YouTube';
 import { AgentIcon as PrecisionManufacturingIcon } from '../icons';
 
@@ -77,14 +73,6 @@ export const About: FC<{}> = function About({ }) {
                 aria-label={t('about.watchVideoAria')}
                 href="https://www.youtube.com/watch?v=GfTE2FLyMrs"
             >{t('about.video')}</Button>
-            <Button size="large" variant="outlined" color="primary" 
-                sx={{ textTransform: 'none' }}
-                startIcon={<GitHubIcon aria-hidden="true" />}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={t('about.viewGithubAria')}
-                href="https://github.com/microsoft/data-formulator"
-            >{t('about.github')}</Button>
         </Box>
     );
 
@@ -213,9 +201,6 @@ export const About: FC<{}> = function About({ }) {
                     <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                         <strong>{t('about.dataHandling')}</strong> {t('about.dataHandlingText')}
                     </Typography>
-                    <Typography variant="body2" sx={{ display: 'block', mt: 1, color: 'text.secondary' }}>
-                        {t('about.researchPrototype')}
-                    </Typography>
                 </Box>
             </Box>
 
@@ -227,26 +212,6 @@ export const About: FC<{}> = function About({ }) {
                     backgroundColor: 'rgba(255, 255, 255, 0.89)',
                     alignItems: 'center', justifyContent: 'center' }}
             >
-                <Button size="small" color="inherit" 
-                        sx={{ textTransform: 'none' }} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        aria-label={t('footer.privacyCookiesAria')}
-                        href="https://www.microsoft.com/en-us/privacy/privacystatement">{t('footer.privacyCookies')}</Button>
-                <Divider orientation="vertical" variant="middle" flexItem sx={{ mx: 1 }} aria-hidden="true" />
-                <Button size="small" color="inherit" 
-                        sx={{ textTransform: 'none' }} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        aria-label={t('footer.termsOfUseAria')}
-                        href="https://www.microsoft.com/en-us/legal/intellectualproperty/copyright">{t('footer.termsOfUse')}</Button>
-                <Divider orientation="vertical" variant="middle" flexItem sx={{ mx: 1 }} aria-hidden="true" />
-                <Button size="small" color="inherit" 
-                        sx={{ textTransform: 'none' }} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        aria-label={t('footer.contactUsAria')}
-                        href="https://github.com/microsoft/data-formulator/issues">{t('footer.contactUs')}</Button>
                 <Typography component="span" sx={{ fontSize: textVar.sm, ml: 1 }}>© {new Date().getFullYear()}</Typography>
             </Box>
         </Box>)

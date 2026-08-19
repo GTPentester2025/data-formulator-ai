@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Tests for ReasoningLogger — structured JSONL reasoning log for Agent sessions.
 
 Covers file creation, JSONL format, env-var switch (off/on/verbose), log

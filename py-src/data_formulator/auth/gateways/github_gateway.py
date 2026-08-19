@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """GitHub OAuth authorization-code exchange gateway.
 
 Provides ``/api/auth/github/login`` (redirect to GitHub) and

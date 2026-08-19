@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """GitHub OAuth 2.0 authentication provider.
 
 GitHub is pure OAuth2 (not OIDC — there is no ``id_token``), so the

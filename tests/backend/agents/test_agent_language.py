@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Unit tests for data_formulator.agents.agent_language.
 
 Covers:

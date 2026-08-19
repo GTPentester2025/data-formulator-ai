@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 // Keeps chart rendering fully local.
 //
 // flint-chart's map templates point their topojson basemaps at

@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """URL allowlist for user-provided LLM API base URLs.
 
 When a user adds a custom model via the UI, they can supply an arbitrary

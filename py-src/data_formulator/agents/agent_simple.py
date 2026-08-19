@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Lightweight single-turn agents that wrap a system prompt + one LLM call.
 
 Each method takes a ``Client`` instance plus task-specific parameters and

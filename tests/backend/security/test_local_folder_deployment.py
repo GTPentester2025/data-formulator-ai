@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Tests for FINDING-3: local_folder connector must be disabled in multi-user mode."""
 
 from __future__ import annotations

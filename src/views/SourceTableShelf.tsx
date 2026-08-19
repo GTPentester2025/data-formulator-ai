@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 // Source table shelf — the pinned list of loaded (non-derived) tables.
 //
 // The shelf is deliberately NOT part of the thread system: it owns no timeline,

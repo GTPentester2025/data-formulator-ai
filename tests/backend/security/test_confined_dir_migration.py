@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Regression tests for Phase 5 ConfinedDir migration.
 
 Verifies that Workspace.confined_* properties, agent tool path safety,

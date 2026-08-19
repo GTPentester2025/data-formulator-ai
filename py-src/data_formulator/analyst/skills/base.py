@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Skill protocol and shared types for the analyst agent.
 
 A *skill* is a passive plugin the single analyst agent can switch on. It never

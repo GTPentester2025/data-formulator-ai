@@ -54,10 +54,3 @@ Notable changes to Data Formulator are documented here. The format follows
 - Improved application responsiveness.
 
 For earlier releases, see the
-[GitHub release history](https://github.com/microsoft/data-formulator/releases).
-
-[Unreleased]: https://github.com/microsoft/data-formulator/compare/0.8.0b1...HEAD
-[0.8.0b1]: https://github.com/microsoft/data-formulator/releases/tag/0.8.0b1
-[0.7]: https://github.com/microsoft/data-formulator/releases/tag/0.7
-[0.6]: https://github.com/microsoft/data-formulator/releases/tag/0.6
-[0.5.1]: https://github.com/microsoft/data-formulator/releases/tag/0.5.1

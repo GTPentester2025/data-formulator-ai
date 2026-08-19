@@ -282,7 +282,7 @@ In production (Azure App Service, AKS, etc.) you can authenticate the app to blo
    # AZURE_BLOB_CONTAINER=data-formulator
    ```
 
-   The app uses [`DefaultAzureCredential`](https://learn.microsoft.com/python/api/azure-identity/azure.identity.defaultazurecredential), which automatically picks up the Managed Identity.
+   The app uses `DefaultAzureCredential`, which automatically picks up the Managed Identity.
 
 4. **For local development** with the same Entra ID path, log in with the Azure CLI:
 

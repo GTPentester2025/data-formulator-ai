@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 import _, {  } from "lodash";
 import { useEffect, useRef } from "react";
 import ts from "typescript";

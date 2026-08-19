@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 import React from 'react';
 import { Box, Typography, SxProps } from "@mui/material";
 import { textVar } from '../app/layout';

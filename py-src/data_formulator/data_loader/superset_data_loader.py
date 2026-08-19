@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """SupersetLoader — ExternalDataLoader implementation for Apache Superset.
 
 Treats Superset as a hierarchical data source:

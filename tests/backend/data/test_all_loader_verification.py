@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Verification tests for all data loader catalog hierarchies and static methods.
 
 Ensures every registered loader correctly implements:

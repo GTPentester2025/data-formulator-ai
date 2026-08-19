@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Log sanitization utilities for preventing sensitive data leakage.
 
 Provides two layers of defense:

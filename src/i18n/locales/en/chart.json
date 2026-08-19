@@ -50,7 +50,6 @@
     "adjustSampleSize": "Adjust sample size: {{sampleSize}} / {{totalSize}} rows",
     "log": "log",
     "insight": "insight",
-    "openInVegaEditor": "Open in Vega Editor",
     "viewChartSpec": "View chart spec",
     "editChart": "Edit chart",
     "chartInsight": "Chart insight",

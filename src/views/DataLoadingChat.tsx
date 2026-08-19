@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 import * as React from 'react';
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import Markdown from 'react-markdown';

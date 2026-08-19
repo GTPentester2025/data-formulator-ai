@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 // Shared, human-friendly formatting for source-filter operators and chips.
 // Backend operators are query syntax (EQ, GTE, ILIKE, ...); user-facing chips
 // follow the conventional compact label–value pattern for common filters

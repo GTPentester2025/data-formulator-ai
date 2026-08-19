@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Backend OIDC Confidential Client gateway.
 
 When ``OIDC_CLIENT_SECRET`` is set (or ``AUTH_MODE=backend`` is forced),

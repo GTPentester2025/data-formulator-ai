@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 /**
  * VirtualizedCatalogTree — virtualized catalog tree for large catalogs
  * (5000+ nodes).

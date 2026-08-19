@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Knowledge store — manages user knowledge files and data-source memory.
 
 Each user has a ``knowledge/`` directory under their home with two

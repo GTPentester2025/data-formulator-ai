@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Tests for DockerSandbox output path validation.
 
 The DockerSandbox uses ``safe_data_filename`` + ``os.path.realpath`` +

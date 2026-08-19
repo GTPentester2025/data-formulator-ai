@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Tests for attach_reasoning_content / accumulate_reasoning_content helpers."""
 
 import pytest

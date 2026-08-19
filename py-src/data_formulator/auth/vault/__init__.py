@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Credential Vault factory — returns the global vault instance.
 
 Key resolution (first match wins):

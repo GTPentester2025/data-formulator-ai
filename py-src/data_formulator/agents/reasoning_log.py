@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Structured reasoning logger for Agent sessions.
 
 Each ``ReasoningLogger`` instance is bound to one Agent session and writes

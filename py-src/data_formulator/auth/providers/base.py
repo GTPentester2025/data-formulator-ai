@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Base classes for the pluggable authentication provider system.
 
 AuthProvider subclasses are auto-discovered at startup. Each provider

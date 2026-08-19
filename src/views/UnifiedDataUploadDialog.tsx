@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 import * as React from 'react';
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { borderColor, transition, radius } from '../app/tokens';

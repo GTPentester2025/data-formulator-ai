@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 # Minimal sandbox image used by the Docker sandbox backend.
 # This image is intentionally small — it only needs the packages
 # required to execute user-generated data-transformation code.

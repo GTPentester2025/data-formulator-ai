@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 import React, { useEffect, useState } from 'react';
 import { Box, SxProps, Theme, Typography } from '@mui/material';
 import { keyframes } from '@mui/system';

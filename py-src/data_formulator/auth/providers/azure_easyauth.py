@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Azure App Service built-in authentication (EasyAuth) provider.
 
 When Data Formulator is deployed on Azure App Service with authentication

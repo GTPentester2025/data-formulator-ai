@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """
 =============================================================================
 CHART SEMANTICS — Lightweight type resolution for VL spec assembly

@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Unit tests for the TokenStore credential manager.
 
 TokenStore is a session-backed credential store with a six-level resolution

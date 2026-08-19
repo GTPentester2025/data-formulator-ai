@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 /**
  * Shared module-level cache for display-row samples used by the focused
  * canvas. Lets background services (e.g. ChartRenderService) reuse the

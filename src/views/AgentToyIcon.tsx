@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 import React from 'react';
 import { Box, SvgIcon, SvgIconProps } from '@mui/material';
 

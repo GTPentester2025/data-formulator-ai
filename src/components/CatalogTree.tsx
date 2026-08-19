@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 /**
  * Shared catalog-tree types, helpers, and styled components.
  * Used by both DBTableManager (inside dialogs) and DataSourceSidebar (persistent panel).

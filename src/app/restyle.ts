@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 /**
  * Chart restyle helpers — used by both the input-bubble brush button
  * (EncodingShelfCard) and the stale-variant overlay (VisualizationView).

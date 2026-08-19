@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 import { FC } from 'react'
 import { useSelector } from 'react-redux'
 import { DataFormulatorState, dfSelectors } from '../app/dfSlice';

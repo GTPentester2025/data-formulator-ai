@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """
 Single source of truth for table-name sanitisation across the datalake, API,
 data loaders, and DuckDB SQL helpers.

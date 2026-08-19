@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 // Compact, horizontal chart-config bar surfaced directly below the chart for
 // quick edits (toggles, sliders, discrete option selects). It mirrors the
 // template-driven config properties from the encoding shelf but in a single

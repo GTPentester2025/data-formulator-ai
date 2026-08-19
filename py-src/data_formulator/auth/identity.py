@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Authentication and identity management for Data Formulator.
 
 Pluggable single-provider model with anonymous fallback::

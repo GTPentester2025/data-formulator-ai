@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Path confinement primitive — prevents path traversal at the API level.
 
 Usage::

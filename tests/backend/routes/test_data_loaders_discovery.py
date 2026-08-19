@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Integration test: plugin loaders appear in /api/data-loaders.
 
 This is the end-to-end "drop a file → connector card appears" contract.

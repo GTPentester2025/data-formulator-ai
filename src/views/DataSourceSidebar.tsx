@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 /**
  * DataSourceSidebar — persistent collapsible panel on the left edge.
  * Shows connected data sources with catalog trees.  Users can click

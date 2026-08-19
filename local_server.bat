@@ -1,6 +1,3 @@
-:: Copyright (c) Microsoft Corporation.
-:: Licensed under the MIT License.
-
 @echo off
 :: Set HTTP proxy environment variables only (Flask doesn't support SOCKS5)
 :: set http_proxy=http://127.0.0.1:7890

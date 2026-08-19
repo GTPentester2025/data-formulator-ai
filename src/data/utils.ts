@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 import * as d3 from 'd3';
 import Column from './column';
 import * as ExcelJS from 'exceljs';

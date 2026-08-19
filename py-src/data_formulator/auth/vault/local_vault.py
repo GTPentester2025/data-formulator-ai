@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """SQLite + Fernet encrypted credential vault.
 
 Storage location: ``DATA_FORMULATOR_HOME/credentials.db``

@@ -1,5 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
 //
 // Shared chat-style input box for agent surfaces. Renders a rounded
 // border with focus glow, an inline image-preview row, a file-attach

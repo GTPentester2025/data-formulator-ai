@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Tests for WorkflowDistillAgent and the /api/knowledge/distill-workflow endpoint.
 
 Covers:

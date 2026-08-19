@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Tests for URL allowlist (SSRF protection for user-provided api_base)."""
 
 import os

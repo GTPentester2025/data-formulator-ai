@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Shared context builders for agent prompts.
 
 Extracted from DataAgent so that both DataAgent and InteractiveExploreAgent

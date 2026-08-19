@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Unit tests for data_formulator.agents.client_utils.Client.
 
 Tests cover the pure-logic parts that don't require a live LLM:

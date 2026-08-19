@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Shared helpers for sanitizing error messages before they reach the client."""
 
 from __future__ import annotations

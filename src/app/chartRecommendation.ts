@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 /**
  * Agent response resolution — maps AI agent chart recommendations to
  * concrete Chart objects.

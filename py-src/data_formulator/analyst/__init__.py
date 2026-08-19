@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Analyst agent — a single user-facing data agent hosting multiple skills.
 
 This package unifies the former ``DataAgent`` (structured-action visualization

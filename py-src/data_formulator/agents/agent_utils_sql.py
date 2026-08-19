@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """
 SQL-related utility functions for agents.
 These functions are used across multiple agents for DuckDB operations and SQL data summaries.

@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 import React, { FC, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {

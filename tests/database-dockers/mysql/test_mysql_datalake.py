@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """
 Tests for MySQL data loader: connect to MySQL, read data into the datalake,
 and get information about the data tables.

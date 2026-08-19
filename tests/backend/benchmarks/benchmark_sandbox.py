@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
 
 """Benchmark sandbox execution speed across local and docker modes.
 

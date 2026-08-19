@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Unified error types for the Data Formulator backend.
 
 Every business error raised in routes / agents / data layer should be an

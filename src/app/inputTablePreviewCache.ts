@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 import { InputTable, InputTablePreview } from '../components/ComponentType';
 
 export const INPUT_TABLE_PREVIEW_ROW_LIMIT = 10;

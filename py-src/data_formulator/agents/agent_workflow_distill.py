@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Workflow distillation agent — extracts a replayable workflow from analysis context.
 
 Given a user-visible analysis context (timeline of events) plus an optional

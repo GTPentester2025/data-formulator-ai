@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 import React, { useState, useCallback, useRef } from 'react';
 import { borderColor, transition, radius } from '../app/tokens';
 import { dialogHeight, textVar } from '../app/layout';

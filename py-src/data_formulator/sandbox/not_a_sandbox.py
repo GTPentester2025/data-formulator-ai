@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Unsandboxed main-process executor -- for benchmarking only.
 
 This runs user code directly in the main process with no isolation.

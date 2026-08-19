@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Lightweight ID / filename sanitisation helpers.
 
 No heavy dependencies (no pandas, pyarrow, etc.) so that both

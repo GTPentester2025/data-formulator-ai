@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 /**
  * Knowledge state management — React hooks for knowledge CRUD & search.
  *

@@ -862,7 +862,7 @@ export const DataLoaderForm: React.FC<{
                                             )}
                                         />,
                                         <Tooltip title={t('db.findClusterPortal', { defaultValue: 'Find your cluster in the Azure portal' })}>
-                                            <IconButton size="small" component="a" href="https://portal.azure.com/#browse/Microsoft.Kusto%2Fclusters" target="_blank" rel="noopener noreferrer">
+                                            <IconButton size="small" component="a" href="https://portal.azure.com/#browse/resourceGroups" target="_blank" rel="noopener noreferrer">
                                                 <OpenInNewIcon sx={{ fontSize: iconVar.md }} />
                                             </IconButton>
                                         </Tooltip>

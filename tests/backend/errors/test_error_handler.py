@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Tests for the unified error handler (error_handler.py).
 
 Covers three layers:

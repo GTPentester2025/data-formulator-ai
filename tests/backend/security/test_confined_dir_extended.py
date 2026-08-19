@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Tests for extended ConfinedDir API (read_text, write_text, exists, iterdir, rglob, unlink).
 
 These methods are needed by ReasoningLogger and KnowledgeStore.  All path

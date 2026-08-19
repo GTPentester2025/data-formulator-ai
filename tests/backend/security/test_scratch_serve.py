@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Security tests for scratch_serve — path traversal and access control."""
 
 from __future__ import annotations

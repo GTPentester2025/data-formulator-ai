@@ -32,13 +32,12 @@ Your full dataset never leaves the machine. Uploads are processed locally
   stripped rather than fetched.
 * **AI-generated code cannot call out.** It runs in a sandbox that blocks
   sockets, `urllib`/`requests`/`http`, `subprocess`, and file writes.
+* **No "open in external editor" path.** The upstream "Open in Vega Editor"
+  action posted the chart spec — data rows included — to a third-party page.
+  It has been removed entirely.
 
 ## Things that do reach out — and only when you choose them
 
-* **"Open in Vega Editor"** — sends the chart spec, *including its data rows*,
-  to `vega.github.io/editor`. It is a small link at the bottom of the
-  encoding-shelf popover (the ⚙/Tune button on the chart toolbar). Never
-  automatic; avoid it for sensitive data.
 * **URL data sources** — if you load a table from a URL, your browser fetches
   that URL directly and re-polls it on a timer while the session is open.
 * **Example datasets / demo streams** — fetch from GitHub, USGS, Open-Meteo, or

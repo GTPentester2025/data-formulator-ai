@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 import { Type } from './types';
 import { computeUniqueValues } from './utils';
 

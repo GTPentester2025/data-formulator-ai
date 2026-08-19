@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Unit tests for the DataConnector framework.
 
 Tests the generic lifecycle wrapper using a mock ExternalDataLoader — no

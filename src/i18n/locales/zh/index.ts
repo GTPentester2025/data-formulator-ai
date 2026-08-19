@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 import common from './common.json';
 import upload from './upload.json';
 import chart from './chart.json';

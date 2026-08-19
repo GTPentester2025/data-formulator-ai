@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """core skill — the analyst's always-on baseline capabilities.
 
 Every other skill is optional and gated; ``core`` is ``always_on`` and loaded

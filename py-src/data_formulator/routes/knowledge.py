@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Knowledge management API — CRUD + search + workflow distillation.
 
 All endpoints use ``POST`` with JSON body.  Access is scoped to the

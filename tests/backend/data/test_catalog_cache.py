@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Tests for the catalog_cache module and its integration with DataConnector.
 
 Covers:

@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Per-user history of non-secret model endpoint configurations."""
 
 from __future__ import annotations

@@ -1,6 +1,4 @@
 
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
 
 import { FC } from 'react'
 import { useDrag } from 'react-dnd'

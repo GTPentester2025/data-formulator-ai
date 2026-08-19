@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Unified credential manager for all third-party systems.
 
 Resolves credentials through a priority chain:

@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Tests for the data-loader plugin scanner.
 
 The scanner runs at module import time, so each test sets up env vars and

@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Conversational data loading agent.
 
 General-purpose conversational agent that can:

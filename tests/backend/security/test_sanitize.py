@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Tests for error message sanitization (sanitize.py).
 
 Verifies that API keys, file paths, and stack traces are redacted

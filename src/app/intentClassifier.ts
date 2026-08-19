@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 /**
  * Intent classifier — routes a user's chart-prompt to the right agent on Enter.
  *

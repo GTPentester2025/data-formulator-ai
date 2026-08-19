@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Sandbox security tests — verify that untrusted code is properly confined.
 
 These tests focus on what the sandbox must BLOCK, not on whether valid

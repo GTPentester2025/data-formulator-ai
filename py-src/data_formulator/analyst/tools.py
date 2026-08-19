@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Inspection tools for the analyst agent.
 
 Tools are parallel-safe, internal, side-effect-free capabilities the agent may

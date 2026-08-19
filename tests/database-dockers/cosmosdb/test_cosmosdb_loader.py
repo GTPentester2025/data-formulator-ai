@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """
 Tests for Cosmos DB data loader using workspace/datalake design.
 

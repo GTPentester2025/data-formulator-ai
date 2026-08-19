@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 /**
  * Versioned migrations for the persisted Data Formulator state
  * (`session_state.json` on the server, IndexedDB for ephemeral, and exported

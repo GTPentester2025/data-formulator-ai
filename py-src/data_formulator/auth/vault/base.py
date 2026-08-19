@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Abstract interface for credential storage backends."""
 from __future__ import annotations
 

@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Tests for SupersetLoader via DataConnector routes.
 
 All Superset API calls are mocked — no real Superset instance needed.

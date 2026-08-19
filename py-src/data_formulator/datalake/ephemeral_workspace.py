@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """TTL-managed local workspaces for anonymous/demo deployments.
 
 ``WORKSPACE_BACKEND=ephemeral`` uses the normal on-disk workspace format, but

@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Tests for df_to_safe_records — the single entry-point for
 DataFrame → JSON-safe records conversion."""
 

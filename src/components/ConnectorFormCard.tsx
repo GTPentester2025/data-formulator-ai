@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 /**
  * ConnectorFormCard — inline connection form rendered inside the data-loading
  * chat (design 38). The agent proposes a connection via the `propose_connection`

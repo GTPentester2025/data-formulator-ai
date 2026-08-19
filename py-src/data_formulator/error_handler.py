@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Unified error handling and response helpers for the Data Formulator Flask application.
 
 Public entry points:

@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Unit tests for the OIDC gateway blueprints.
 
 Tests ``oidc_bp`` (backend OIDC Confidential Client flow) and

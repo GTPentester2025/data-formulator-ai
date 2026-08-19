@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Sample datasets data loader.
 
 Exposes the built-in ``EXAMPLE_DATASETS`` catalog as a virtual data

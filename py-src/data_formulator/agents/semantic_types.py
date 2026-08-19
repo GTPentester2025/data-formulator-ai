@@ -1,13 +1,10 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """
 =============================================================================
 SEMANTIC TYPE SYSTEM  (Python mirror of the TypeScript registry)
 =============================================================================
 
 The **source of truth** for semantic types lives in the flint-chart library
-(npm package `flint-chart`, repo microsoft/flint-chart):
+(npm package `flint-chart`):
     packages/flint-js/src/core/type-registry.ts
 
 This file mirrors the registered types and provides:

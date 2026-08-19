@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 /**
  * Column filter popover for `SelectableDataGrid` (design-doc 31).
  *

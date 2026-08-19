@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 import os
 
 # Privacy: litellm fetches its model-cost map from raw.githubusercontent.com

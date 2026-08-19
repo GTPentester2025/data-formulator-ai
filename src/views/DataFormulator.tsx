@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import '../scss/App.scss';
 
@@ -60,7 +57,6 @@ import { ModelSelectionButton } from './ModelSelectionDialog';
 import { UnifiedDataUploadDialog, UploadTabType, DataLoadMenu, ConnectorInstance } from './UnifiedDataUploadDialog';
 import { ReportView } from './ReportView';
 import { DataSourceSidebar } from './DataSourceSidebar';
-import GitHubIcon from '@mui/icons-material/GitHub';
 import { ExampleSession, exampleSessions, ExampleSessionCard, fetchExampleSessions } from './ExampleSessions';
 import { useDataRefresh, useDerivedTableRefresh } from '../app/useDataRefresh';
 import { useTranslation } from 'react-i18next';
@@ -768,20 +764,6 @@ export const DataFormulatorFC = ({ }) => {
     let footer = <Box sx={{ color: 'text.secondary', display: 'flex', 
             backgroundColor: 'rgba(255, 255, 255, 0.89)',
             alignItems: 'center', justifyContent: 'center' }}>
-        <Button size="small" color="inherit" 
-            sx={{ textTransform: 'none'}} 
-            target="_blank" rel="noopener noreferrer" 
-            href="https://www.microsoft.com/en-us/privacy/privacystatement">{t('footer.privacyCookies')}</Button>
-        <Divider orientation="vertical" variant="middle" flexItem sx={{ mx: 1 }} />
-        <Button size="small" color="inherit" 
-            sx={{ textTransform: 'none'}} 
-            target="_blank" rel="noopener noreferrer" 
-            href="https://www.microsoft.com/en-us/legal/intellectualproperty/copyright">{t('footer.termsOfUse')}</Button>
-        <Divider orientation="vertical" variant="middle" flexItem sx={{ mx: 1 }} />
-        <Button size="small" color="inherit" 
-            sx={{ textTransform: 'none'}} 
-            target="_blank" rel="noopener noreferrer" 
-            href="https://github.com/microsoft/data-formulator/issues">{t('footer.contactUs')}</Button>
         <Typography sx={{ display: 'inline', fontSize: textVar.sm, ml: 1 }}> @ {new Date().getFullYear()}</Typography>
     </Box>
 
@@ -880,28 +862,8 @@ export const DataFormulatorFC = ({ }) => {
                     >
                         {t('landing.demoBannerBody', {
                             defaultValue:
-                                'This is a demo site! Try the examples below or upload files. To work with large datasets, connect to databases, link local folders, create persisted analysis sessions, use custom models, and manage users, check the ',
+                                'This is a demo site! Try the examples below or upload files. To work with large datasets, connect to databases, link local folders, create persisted analysis sessions, use custom models, and manage users, run a local install.',
                         })}
-                        <Link
-                            href="https://github.com/microsoft/data-formulator"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            underline="hover"
-                            sx={{
-                                color: 'primary.main',
-                                '&:hover': { color: 'primary.dark' },
-                            }}
-                        >
-                            <GitHubIcon
-                                sx={{
-                                    fontSize: '1em',
-                                    verticalAlign: '-0.15em',
-                                    mr: 0.4,
-                                }}
-                            />
-                            {t('landing.demoBannerCta', { defaultValue: 'installation guide' })}
-                        </Link>
-                        {t('landing.demoBannerSuffix', { defaultValue: '.' })}
                     </Typography>
                 </Box>
             )}

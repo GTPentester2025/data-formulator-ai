@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 /**
  * LocalInstallUpgradePanel — shown when DISABLE_DATA_CONNECTORS is true.
  *
@@ -23,17 +20,14 @@ import StorageIcon from '@mui/icons-material/Storage';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import VpnKeyOutlinedIcon from '@mui/icons-material/VpnKeyOutlined';
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
-import GitHubIcon from '@mui/icons-material/GitHub';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CheckIcon from '@mui/icons-material/Check';
 import { useTranslation } from 'react-i18next';
 import { iconVar, textVar } from '../app/layout';
 
 const UVX_CMD = 'uvx --prerelease=allow data-formulator';
-const REPO_URL = 'https://github.com/microsoft/data-formulator';
 const PYPI_URL = 'https://pypi.org/project/data-formulator/';
 const UV_INSTALL_URL = 'https://docs.astral.sh/uv/getting-started/installation/';
-const INSTALL_GUIDE_URL = 'https://github.com/microsoft/data-formulator#get-started';
 
 interface FeatureRow {
     icon: React.ReactNode;
@@ -231,42 +225,13 @@ export const LocalInstallUpgradePanel: React.FC<LocalInstallUpgradePanelProps> =
                         uv
                     </Link>
                     {t('upload.upgrade.requirementsTail', {
-                        defaultValue: '. Prefer pip, conda, or Docker? See ',
+                        defaultValue: '. pip, conda, and Docker also work.',
                     })}
-                    <Link
-                        href={INSTALL_GUIDE_URL}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        underline="hover"
-                    >
-                        {t('upload.upgrade.otherInstallMethods', {
-                            defaultValue: 'other install methods',
-                        })}
-                    </Link>
-                    .
                 </Typography>
             </Box>
 
             {/* Links */}
             <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-                <Link
-                    href={REPO_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    underline="hover"
-                    sx={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 0.5,
-                        color: 'text.secondary',
-                        '&:hover': { color: 'primary.main' },
-                    }}
-                >
-                    <GitHubIcon sx={{ fontSize: iconVar.md }} />
-                    <Typography component="span" sx={{ fontSize: textVar.md, lineHeight: 1.4 }}>
-                        {t('upload.upgrade.viewOnGithub', { defaultValue: 'View on GitHub' })}
-                    </Typography>
-                </Link>
                 <Link
                     href={PYPI_URL}
                     target="_blank"

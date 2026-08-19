@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 # ---------------------------------------------------------------------------
 # Stage 1: Build the React/TypeScript frontend
 # ---------------------------------------------------------------------------

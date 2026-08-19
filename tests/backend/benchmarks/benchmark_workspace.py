@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
 
 """
 Benchmark workspace read performance: Local vs Azure Blob vs Azure+Cache.

@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Tests for FINDING-5: startup safety checks."""
 
 from __future__ import annotations

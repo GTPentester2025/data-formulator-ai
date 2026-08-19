@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """AnalystAgent — the unified data analyst agent shell.
 
 This is the single user-facing data agent that replaces the separate

@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 /** Drag-and-drop item types and interfaces shared across components. */
 
 /** DnD item type for catalog table nodes dragged from the sidebar. */

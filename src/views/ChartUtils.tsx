@@ -1,5 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
 //
 // Shared chart utility functions — extracted from VisualizationView to break
 // circular dependencies between views.

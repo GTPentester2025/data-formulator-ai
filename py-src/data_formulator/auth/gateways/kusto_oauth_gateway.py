@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Microsoft delegated OAuth flow for Kusto connector access."""
 
 from __future__ import annotations

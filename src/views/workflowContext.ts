@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 /**
  * workflowContext — pure helpers that turn DataFormulator state into
  * the timeline payload sent to `/api/knowledge/distill-workflow`.

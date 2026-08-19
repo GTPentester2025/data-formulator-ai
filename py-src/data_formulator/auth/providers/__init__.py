@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Auto-discovery registry for AuthProvider subclasses.
 
 On import, every ``.py`` module in this package (except ``base``) is

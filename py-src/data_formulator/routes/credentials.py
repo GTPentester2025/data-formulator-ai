@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """REST API for credential management (list / store / delete).
 
 All endpoints are identity-scoped: the current user (from

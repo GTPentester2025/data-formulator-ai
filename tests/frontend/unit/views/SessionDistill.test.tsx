@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 /**
  * Unit tests for the session-scoped distillation flow
  * (design-docs/24-session-scoped-distillation.md).

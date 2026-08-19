@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """report skill — turns an exploration into a Markdown report.
 
 The analyst shell decides to write a report (the ``write_report`` **action**),

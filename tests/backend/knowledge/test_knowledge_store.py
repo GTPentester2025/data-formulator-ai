@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Tests for KnowledgeStore — CRUD, path validation, front matter, search.
 
 Covers:

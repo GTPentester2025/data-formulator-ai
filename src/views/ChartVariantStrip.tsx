@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 // Horizontal strip of Flint themes and chart style variants created by the
 // restyle agent. Themes apply to the encoded base chart; custom variants are
 // saved chart-specific specs that override that base while active.

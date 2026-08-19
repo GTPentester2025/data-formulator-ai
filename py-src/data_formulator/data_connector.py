@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """DataConnector — generic lifecycle wrapper for ExternalDataLoader.
 
 Takes any ``ExternalDataLoader`` class and auto-generates a Flask Blueprint

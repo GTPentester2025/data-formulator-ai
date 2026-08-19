@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Tests for log sanitization utilities (log_sanitizer.py).
 
 Covers URL credential masking, dict parameter sanitization, token redaction,

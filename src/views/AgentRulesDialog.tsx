@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 /**
  * AgentRulesDialog — knowledge-backed rules editor.
  *

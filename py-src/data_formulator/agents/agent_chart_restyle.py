@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Chart restyle agent.
 
 A single-turn agent that takes a Vega-Lite spec + a natural-language instruction

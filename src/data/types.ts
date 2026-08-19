@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 export enum Type {
     String = 'string',
     Boolean = 'boolean',

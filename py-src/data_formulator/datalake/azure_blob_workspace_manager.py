@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """
 AzureBlobWorkspaceManager — manages multiple workspaces per user on Azure Blob Storage.
 

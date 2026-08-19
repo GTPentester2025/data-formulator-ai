@@ -1,14 +1,8 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 import argparse
 import sys
 import os
 import warnings
 import mimetypes
-
-# The litellm model-cost-map fetch is disabled in data_formulator/__init__.py,
-# which runs before this module is imported.
 mimetypes.add_type('application/javascript', '.js')
 mimetypes.add_type('application/javascript', '.mjs')
 

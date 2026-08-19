@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import '../scss/App.scss';
 
@@ -103,7 +100,6 @@ import ChatIcon from '@mui/icons-material/Chat';
 import ArticleIcon from '@mui/icons-material/Article';
 import EditIcon from '@mui/icons-material/Edit';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import GitHubIcon from '@mui/icons-material/GitHub';
 import UploadIcon from '@mui/icons-material/Upload';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import YouTubeIcon from '@mui/icons-material/YouTube';
@@ -357,7 +353,6 @@ const PageNavMenu: React.FC<{ isAboutPage: boolean }> = ({ isAboutPage }) => {
 };
 
 const EXTERNAL_LINKS = {
-    github: 'https://github.com/microsoft/data-formulator',
     youtube: 'https://youtu.be/3ndlwt0Wi3c',
     pip: 'https://pypi.org/project/data-formulator/',
     discord: 'https://discord.gg/mYCZMQKYZb',
@@ -1162,11 +1157,6 @@ const AppShell: FC = () => {
                         </Box>
                         </>
                         )}
-                        {!isCompactToolbar && !activeWorkspace && (
-                            <Typography noWrap sx={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', fontWeight: 500, fontSize: '0.65rem', color: 'text.secondary', letterSpacing: '0.15em', textTransform: 'uppercase' }}>
-                                {t('appBar.microsoftResearch')}
-                            </Typography>
-                        )}
                         {/* Workspace name — session indicator/switcher. Centered
                             absolutely when there is room, otherwise it flows
                             between the nav menu and the trailing actions. */}
@@ -1202,12 +1192,6 @@ const AppShell: FC = () => {
                                             icon: <TerminalOutlinedIcon fontSize="small" />,
                                             onClick: () => setLogsOpen(true),
                                         }] : []),
-                                        {
-                                            key: 'github',
-                                            label: t('appBar.viewOnGitHub'),
-                                            icon: <GitHubIcon fontSize="small" />,
-                                            href: EXTERNAL_LINKS.github,
-                                        },
                                         ...(inSession ? [{
                                             key: 'exit',
                                             label: t('workspace.exit', { defaultValue: 'Exit' }),
@@ -1226,23 +1210,6 @@ const AppShell: FC = () => {
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
                                     <ConfigDialog />
                                     {serverConfig.IS_LOCAL_MODE && <LogViewerDialog />}
-                                    <Tooltip title={t('appBar.viewOnGitHub')}>
-                                        <IconButton
-                                            component="a"
-                                            href="https://github.com/microsoft/data-formulator"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            size="small"
-                                            aria-label={t('appBar.viewOnGitHub')}
-                                            sx={{
-                                                p: 0.5,
-                                                color: 'text.secondary',
-                                                '&:hover': { color: 'text.primary', backgroundColor: 'rgba(0, 0, 0, 0.04)' },
-                                            }}
-                                        >
-                                            <GitHubIcon fontSize="small" />
-                                        </IconButton>
-                                    </Tooltip>
                                 </Box>
                                 {inSession && (
                                     <>
@@ -1270,12 +1237,6 @@ const AppShell: FC = () => {
                                             label: t('appBar.watchVideo'),
                                             icon: <YouTubeIcon fontSize="small" />,
                                             href: EXTERNAL_LINKS.youtube,
-                                        },
-                                        {
-                                            key: 'github',
-                                            label: t('appBar.viewOnGitHub'),
-                                            icon: <GitHubIcon fontSize="small" />,
-                                            href: EXTERNAL_LINKS.github,
                                         },
                                         {
                                             key: 'pip',
@@ -1312,23 +1273,6 @@ const AppShell: FC = () => {
                                         }}
                                     >
                                         <YouTubeIcon fontSize="small" />
-                                    </IconButton>
-                                </Tooltip>
-                                <Tooltip title={t('appBar.viewOnGitHub')}>
-                                    <IconButton
-                                        component="a"
-                                        href="https://github.com/microsoft/data-formulator"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        aria-label={t('appBar.viewOnGitHub')}
-                                        sx={{
-                                            color: 'inherit',
-                                            '&:hover': {
-                                                backgroundColor: 'rgba(0, 0, 0, 0.04)'
-                                            }
-                                        }}
-                                    >
-                                        <GitHubIcon fontSize="small" />
                                     </IconButton>
                                 </Tooltip>
                                 <Tooltip title={t('appBar.pipInstall')}>

@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Authenticate users via the Superset REST API (JWT)."""
 
 from __future__ import annotations

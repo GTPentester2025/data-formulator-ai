@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """
 Tests for BigQuery Data Loader using BigQuery Emulator and the workspace/datalake design.
 

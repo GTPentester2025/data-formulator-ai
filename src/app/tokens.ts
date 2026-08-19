@@ -169,7 +169,7 @@ export const palettes: Record<string, AppPalette> = {
         warning:   { main: '#bf5600' },
     },
 
-    /** Microsoft Fluent UI palette
+    /** Fluent UI palette
      *  Primary/Custom: split-complementary (blue 205° ↔ orange 18°) */
     fluent: {
         name: 'Fluent UI',
@@ -224,7 +224,7 @@ export const palettes: Record<string, AppPalette> = {
         warning:   { main: '#dc2626' },
     },
 
-    /** Microsoft Copilot — inspired by the Copilot gradient spectrum
+    /** Copilot — inspired by the Copilot gradient spectrum
      *  Primary/Custom: analogous pair from the gradient (blue → purple) */
     copilot: {
         name: 'Copilot',

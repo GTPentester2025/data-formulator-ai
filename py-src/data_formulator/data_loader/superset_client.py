@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Thin wrapper around the Superset public REST API."""
 
 from __future__ import annotations

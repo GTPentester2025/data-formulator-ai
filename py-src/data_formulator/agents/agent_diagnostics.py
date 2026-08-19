@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Unified diagnostics builder for all agent pipelines.
 
 Centralises the JSON structure returned as ``result['diagnostics']``,

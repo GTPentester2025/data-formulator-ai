@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Security tests for the Superset SSO bridge test configuration.
 
 The bridge posts short-lived JWTs back to the Data Formulator frontend, so it

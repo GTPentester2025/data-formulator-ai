@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 /**
  * Browser-owned recovery snapshots for TTL-managed ephemeral workspaces.
  *

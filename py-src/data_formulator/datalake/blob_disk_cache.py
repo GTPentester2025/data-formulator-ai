@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Process-persistent, ETag-validated local disk cache for Azure Blob reads.
 
 Azure blob workspaces build a *fresh* :class:`AzureBlobWorkspace` on every

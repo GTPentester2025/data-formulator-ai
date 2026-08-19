@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Local sandbox -- executes Python code in a persistent warm subprocess.
 
 The script runs with the workspace directory as its working directory

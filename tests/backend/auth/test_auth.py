@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Tests for authentication and identity management (auth.py).
 
 Verifies that identity extraction, validation, and namespace isolation

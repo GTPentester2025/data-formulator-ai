@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Tests for normalize_dtype_to_app_type in parquet_utils."""
 
 import pytest

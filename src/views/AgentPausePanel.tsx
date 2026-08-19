@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT License.
-
 /**
  * Unified UI for "agent pause" panels that sit above the chat input in
  * `SimpleChartRecBox`. All three variants share the same chrome (accent

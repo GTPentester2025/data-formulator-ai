@@ -1,41 +1,32 @@
-<!-- BEGIN MICROSOFT SECURITY.MD V0.0.8 BLOCK -->
+# Security
 
-## Security
+## Reporting a vulnerability
 
-Microsoft takes the security of our software products and services seriously, which includes all source code repositories managed through our GitHub organizations, which include [Microsoft](https://github.com/microsoft), [Azure](https://github.com/Azure), [DotNet](https://github.com/dotnet), [AspNet](https://github.com/aspnet), [Xamarin](https://github.com/xamarin), and [our GitHub organizations](https://opensource.microsoft.com/).
+Please report security issues privately to the maintainer of this repository
+rather than opening a public issue.
 
-If you believe you have found a security vulnerability in any Microsoft-owned repository that meets [Microsoft's definition of a security vulnerability](https://aka.ms/opensource/security/definition), please report it to us as described below.
+Useful details to include:
 
-## Reporting Security Issues
+- what kind of issue it is (for example: injection, privilege escalation,
+  credential exposure, SSRF)
+- the file paths and code involved
+- how to reproduce it, including any configuration required
+- what an attacker could achieve with it
 
-**Please do not report security vulnerabilities through public GitHub issues.**
+## Scope notes for this deployment
 
-Instead, please report them to the Microsoft Security Response Center (MSRC) at [https://msrc.microsoft.com/create-report](https://aka.ms/opensource/security/create-report).
+This application is designed to run locally or behind your own
+authentication. A few areas are worth knowing about before exposing it more
+widely:
 
-If you prefer to submit without logging in, send email to [secure@microsoft.com](mailto:secure@microsoft.com).  If possible, encrypt your message with our PGP key; please download it from the [Microsoft Security Response Center PGP Key page](https://aka.ms/opensource/security/pgpkey).
-
-You should receive a response within 24 hours. If for some reason you do not, please follow up via email to ensure we received your original message. Additional information can be found at [microsoft.com/msrc](https://aka.ms/opensource/security/msrc). 
-
-Please include the requested information listed below (as much as you can provide) to help us better understand the nature and scope of the possible issue:
-
-  * Type of issue (e.g. buffer overflow, SQL injection, cross-site scripting, etc.)
-  * Full paths of source file(s) related to the manifestation of the issue
-  * The location of the affected source code (tag/branch/commit or direct URL)
-  * Any special configuration required to reproduce the issue
-  * Step-by-step instructions to reproduce the issue
-  * Proof-of-concept or exploit code (if possible)
-  * Impact of the issue, including how an attacker might exploit the issue
-
-This information will help us triage your report more quickly.
-
-If you are reporting for a bug bounty, more complete reports can contribute to a higher bounty award. Please visit our [Microsoft Bug Bounty Program](https://aka.ms/opensource/security/bounty) page for more details about our active programs.
-
-## Preferred Languages
-
-We prefer all communications to be in English.
-
-## Policy
-
-Microsoft follows the principle of [Coordinated Vulnerability Disclosure](https://aka.ms/opensource/security/cvd).
-
-<!-- END MICROSOFT SECURITY.MD BLOCK -->
+- **User-supplied LLM endpoints.** The server makes outbound requests to the
+  API base URL you configure. Set `DF_ALLOWED_API_BASES` to an allowlist, or
+  pass `--disable-custom-models`, on any shared instance.
+- **Anonymous multi-user mode.** Browser identities are client-supplied and
+  therefore spoofable. Disable data connectors (`--disable-data-connectors`)
+  or require SSO before hosting for more than one person. See the deployment
+  profiles in `DEVELOPMENT.md`.
+- **AI-generated code.** Generated Python runs in a sandbox that blocks
+  network access, file writes, and dangerous imports. Report any escape.
+- **Data flow.** See `PRIVACY.md` for what leaves the machine and what does
+  not.

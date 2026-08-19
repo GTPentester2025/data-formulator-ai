@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Skill registry — discovery and eager instantiation of analyst skills.
 
 Each skill lives in its own sub-package under this directory and ships a

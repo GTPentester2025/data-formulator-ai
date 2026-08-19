@@ -1,6 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-
 """Tests for HMAC-based code signing (code_signing.py).
 
 Verifies that transformation code is signed before being returned to the
