@@ -1,12 +1,35 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import path from 'path';
 
 // Get port from environment variable with fallback to 5567
 const apiPort = process.env.API_PORT || 5567;
 
+// flint-chart's map templates hardcode third-party basemap URLs, so rendering a
+// US/World map would fetch topojson from vega.github.io. Those two files are
+// vendored under public/geo; this rewrites the literals at build time so the
+// upstream host never reaches the bundle. src/app/geoAssets.ts additionally
+// rewrites at runtime, covering stored specs and any local flint checkout.
+const LOCAL_BASEMAPS: Record<string, string> = {
+  'https://vega.github.io/vega-lite/data/us-10m.json': '/geo/us-10m.json',
+  'https://vega.github.io/vega-lite/data/world-110m.json': '/geo/world-110m.json',
+};
+
+const localizeBasemapUrls = (): Plugin => ({
+  name: 'df-localize-basemap-urls',
+  enforce: 'pre',
+  transform(code, id) {
+    if (!id.includes('flint-chart')) return null;
+    let out = code;
+    for (const [remote, local] of Object.entries(LOCAL_BASEMAPS)) {
+      out = out.split(remote).join(local);
+    }
+    return out === code ? null : { code: out, map: null };
+  },
+});
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [localizeBasemapUrls(), react()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

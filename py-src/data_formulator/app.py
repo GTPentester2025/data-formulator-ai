@@ -7,12 +7,8 @@ import os
 import warnings
 import mimetypes
 
-# Privacy: litellm fetches its model-cost map from raw.githubusercontent.com at
-# import time unless told to use the bundled copy. No user data is sent, but it
-# leaks server IP/start events and stalls offline startups. Must be set before
-# the first ``import litellm`` anywhere in the process. Operators can still
-# opt back in by exporting LITELLM_LOCAL_MODEL_COST_MAP=False.
-os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
+# The litellm model-cost-map fetch is disabled in data_formulator/__init__.py,
+# which runs before this module is imported.
 mimetypes.add_type('application/javascript', '.js')
 mimetypes.add_type('application/javascript', '.mjs')
 

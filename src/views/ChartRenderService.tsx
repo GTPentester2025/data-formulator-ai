@@ -24,6 +24,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { DataFormulatorState, dfActions, dfSelectors } from '../app/dfSlice';
 import { Chart, DictTable, FieldItem, FieldSemanticsInfo } from '../components/ComponentType';
 import { assembleVegaChart, prepVisTable } from '../app/utils';
+import { localizeGeoUrls } from '../app/geoAssets';
 import { buildEmbeddedDataForChart } from '../app/restyle';
 import { getDataTable, checkChartAvailability } from './ChartUtils';
 import { getCachedChart, setCachedChart, computeCacheKey, invalidateChart, ChartCacheEntry } from '../app/chartCache';
@@ -195,7 +196,7 @@ export const ChartRenderService: FC = () => {
 
             let fullSpec: any;
             if (activeVariant) {
-                fullSpec = JSON.parse(JSON.stringify(activeVariant.vlSpec));
+                fullSpec = localizeGeoUrls(JSON.parse(JSON.stringify(activeVariant.vlSpec)));
                 // Plug data using the same conversion the assemble pipeline
                 // applies (e.g. Year 1980 → "1980"). Variants embed axis
                 // formats / timeUnit chosen against the converted shape, so

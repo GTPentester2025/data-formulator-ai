@@ -54,6 +54,7 @@ import { displayRowsCache } from '../app/displayRowsCache';
 import { buildEmbeddedDataForChart, applyVariantConfigUI } from '../app/restyle';
 import { apiRequest } from '../app/apiClient';
 import { getCachedChart } from '../app/chartCache';
+import { localizeGeoUrls } from '../app/geoAssets';
 import {
     copyPngDataUrlToClipboard, pngDataUrlToBlob, resolveFullTableRows,
     rowsAndChartToXlsxBlob, rowsToXlsxBlob, safeFileStem, triggerBlobDownload,
@@ -652,7 +653,7 @@ const VegaChartRenderer: FC<{
 
         let spec: any;
         if (activeVariant) {
-            spec = JSON.parse(JSON.stringify(activeVariant.vlSpec));
+            spec = localizeGeoUrls(JSON.parse(JSON.stringify(activeVariant.vlSpec)));
             // Re-attach data using the same conversion the assemble pipeline
             // would apply (e.g. Year 1980 → "1980"). Variants store axis
             // formats and timeUnit choices that were chosen against the

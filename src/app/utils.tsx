@@ -11,6 +11,7 @@ import * as d3 from 'd3';
 
 import { assembleVegaLite, type ChartEncoding, type AssembleOptions } from "flint-chart";
 import { getBrowserId } from './identity';
+import { localizeGeoUrls } from './geoAssets';
 
 export function getUrls() {
     return {
@@ -630,7 +631,8 @@ export const assembleVegaChart = (
         };
     }
 
-    return spec;
+    // Map templates ship third-party basemap URLs; serve them from this origin.
+    return localizeGeoUrls(spec);
 }
 
 // resolveRecommendedChart & resolveChartFields remain in app layer (need generateFreshChart, Chart)
