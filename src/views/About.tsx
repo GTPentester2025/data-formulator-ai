@@ -1,9 +1,7 @@
-import { Box, Typography, Button, useTheme, alpha, Divider } from "@mui/material";
+import { Box, Typography, useTheme, alpha, Divider } from "@mui/material";
 import { borderColor, radius } from '../app/tokens';
 import { textVar } from '../app/layout';
 import React, { FC } from "react";
-import GridViewIcon from '@mui/icons-material/GridView';
-import YouTubeIcon from '@mui/icons-material/YouTube';
 import { AgentIcon as PrecisionManufacturingIcon } from '../icons';
 
 import { toolName } from "../app/App";
@@ -50,32 +48,6 @@ export const About: FC<{}> = function About({ }) {
         }
     ];
 
-    let actionButtons = (
-        <Box component="nav" aria-label="Primary actions" sx={{ display: 'flex', justifyContent: 'center', gap: 1.5, mb: 4, flexWrap: 'wrap' }}>
-            <Button size="large" variant="outlined" color="primary" 
-                sx={{ textTransform: 'none' }}
-                startIcon={<Box component="img" sx={{ width: 20, height: 20 }} alt="" aria-hidden="true" src="/pip-logo.svg" />}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={t('about.installViaPipAria')}
-                href="https://pypi.org/project/data-formulator/"
-            >{t('about.installLocally')}</Button>
-            <Button size="large" variant="contained" color="primary" 
-                sx={{ textTransform: 'none' }}
-                startIcon={<GridViewIcon aria-hidden="true" />}
-                href="/app"
-            >{t('about.tryOnlineDemo')}</Button>
-            <Button size="large" variant="outlined" color="primary" 
-                sx={{ textTransform: 'none' }}
-                startIcon={<YouTubeIcon sx={{ color: '#FF0000' }} aria-hidden="true" />}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={t('about.watchVideoAria')}
-                href="https://www.youtube.com/watch?v=GfTE2FLyMrs"
-            >{t('about.video')}</Button>
-        </Box>
-    );
-
     return (
         <Box 
             component="main"
@@ -103,8 +75,6 @@ export const About: FC<{}> = function About({ }) {
                         {t('landing.tagline')}
                     </Typography>
                 </Box>
-                
-                {actionButtons}
 
                 {/* Features Grid - 2 columns, 4 rows */}
                 <Box 

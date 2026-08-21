@@ -11,6 +11,7 @@ import { FC, useCallback, useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Alert, Box, Button, IconButton, Snackbar, Tooltip, Typography } from "@mui/material";
 import LogoutIcon from "@mui/icons-material/Logout";
+import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 import LoginIcon from "@mui/icons-material/Login";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import { useTranslation } from "react-i18next";
@@ -22,6 +23,8 @@ import { persistor } from "./store";
 import { getBrowserId } from "./identity";
 import { apiRequest } from "./apiClient";
 import { iconVar, textVar } from './layout';
+import { fetchAuthStatus, signOut as signOutLocal, type LocalUser } from './localAuth';
+import { UserAdminDialog } from '../views/UserAdminDialog';
 
 export const AuthButton: FC = () => {
     const { t } = useTranslation();
@@ -31,6 +34,10 @@ export const AuthButton: FC = () => {
     const [authInfo, setAuthInfo] = useState<AuthInfo | null>(null);
     const [initError, setInitError] = useState<string | null>(null);
     const [loginError, setLoginError] = useState<string | null>(null);
+    // Populated only when this server holds the accounts, so the button can
+    // offer sign-out and — for administrators — account management.
+    const [localUser, setLocalUser] = useState<LocalUser | null>(null);
+    const [adminOpen, setAdminOpen] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -57,8 +64,26 @@ export const AuthButton: FC = () => {
     }, []);
 
     const isBackend = authInfo?.action === "backend";
+    const isLocalAccounts = authInfo?.action === "form";
+
+    useEffect(() => {
+        if (!isLocalAccounts) return;
+        let cancelled = false;
+        fetchAuthStatus()
+            .then(status => {
+                if (!cancelled) setLocalUser(status.authenticated ? status.user ?? null : null);
+            })
+            .catch(() => { /* signed out */ });
+        return () => { cancelled = true; };
+    }, [isLocalAccounts]);
 
     const handleSignOut = useCallback(async () => {
+        if (isLocalAccounts) {
+            await signOutLocal();
+            await persistor.purge();
+            window.location.href = "/";
+            return;
+        }
         if (isBackend) {
             await apiRequest(authInfo?.logout_url || "/api/auth/oidc/logout", { method: "POST" });
             const browserId = getBrowserId();
@@ -77,7 +102,7 @@ export const AuthButton: FC = () => {
             await persistor.purge();
             window.location.href = "/";
         }
-    }, [mgr, isBackend, authInfo, dispatch]);
+    }, [mgr, isBackend, isLocalAccounts, authInfo, dispatch]);
 
     if (identity?.type === "user") {
         const label = String(identity.displayName || identity.id || '');
@@ -86,7 +111,21 @@ export const AuthButton: FC = () => {
                 <Typography variant="body2" sx={{ fontSize: textVar.sm, opacity: 0.85 }}>
                     {label}
                 </Typography>
-                {(mgr || isBackend) && (
+                {isLocalAccounts && localUser?.role === 'admin' && (
+                    <>
+                        <Tooltip title={t("admin.manageUsers", { defaultValue: "Manage users" })}>
+                            <IconButton size="small" onClick={() => setAdminOpen(true)} sx={{ color: "inherit" }}>
+                                <ManageAccountsIcon sx={{ fontSize: iconVar.lg }} />
+                            </IconButton>
+                        </Tooltip>
+                        <UserAdminDialog
+                            open={adminOpen}
+                            onClose={() => setAdminOpen(false)}
+                            currentUsername={localUser.username}
+                        />
+                    </>
+                )}
+                {(mgr || isBackend || isLocalAccounts) && (
                     <Tooltip title={t("auth.signOut")}>
                         <IconButton
                             size="small"

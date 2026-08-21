@@ -78,6 +78,11 @@ def classify_and_wrap_llm_error(exc: Exception) -> AppError:
     The original exception text is preserved in ``detail`` for server-side
     logging but is **never** included in the client-facing ``message``.
     """
+    # Already a deliberate application error (e.g. AUTH_REQUIRED): keep its
+    # code so the frontend can act on it instead of seeing an LLM failure.
+    if isinstance(exc, AppError):
+        return exc
+
     safe_message = classify_llm_error(exc)
     text = str(exc).lower()
 

@@ -714,7 +714,13 @@
             "importing": "正在导入工作区…",
             "success": "成功导入 {{count}} 个工作区。",
             "failed": "导入失败：{{message}}"
-        }
+        },
+        "signInPrompt": "请登录以继续。",
+        "chooseNewPassword": "请设置新密码以继续。",
+        "newPassword": "新密码",
+        "confirmPassword": "确认新密码",
+        "savePassword": "保存密码",
+        "passwordsDoNotMatch": "两次输入的密码不一致"
     },
     "supersetPanel": {
         "datasets": "数据集",
@@ -1026,5 +1032,24 @@
         "optionSourceDesc": "推导出该结果所用的表，每个表一个工作表，便于查看过程。",
         "cancel": "取消",
         "download": "下载"
+    },
+    "admin": {
+        "title": "用户",
+        "intro": "每个账户的数据相互独立。管理员在此管理账户，但无法打开他人的工作区。",
+        "manageUsers": "管理用户",
+        "addUser": "添加用户",
+        "initialPassword": "初始密码",
+        "role": "角色",
+        "roleUser": "普通用户",
+        "roleAdmin": "管理员",
+        "lastLogin": "上次登录",
+        "actions": "操作",
+        "never": "从未",
+        "you": "（你）",
+        "resetPassword": "重置密码",
+        "deleteUser": "删除用户及其全部数据",
+        "cannotDeleteSelf": "无法删除自己的账户",
+        "copyPassword": "复制密码",
+        "passwordIssued": "{{username}} 的密码：{{password}} —— 请立即转交，之后无法再次查看。"
     }
 }

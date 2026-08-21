@@ -928,6 +928,30 @@ def _cached_source_metadata(source: Any, source_table_id: str) -> dict[str, Any]
 connectors_bp = Blueprint("connectors_global", __name__)
 
 
+def _require_connectors_enabled() -> None:
+    """Reject connector routes when data connectors are turned off.
+
+    Visibility filtering already hides other people's connectors, but these
+    routes previously answered regardless of the disable flag — enumerating
+    every installed loader type and even creating new connectors. On a server
+    that runs with connectors disabled, that is a way back into the feature
+    the operator switched off.
+    """
+    from flask import current_app
+
+    try:
+        disabled = bool(current_app.config.get('CLI_ARGS', {}).get('disable_data_connectors'))
+    except RuntimeError:
+        # Outside an app context (e.g. unit tests) — nothing to enforce.
+        disabled = False
+
+    if disabled:
+        raise AppError(
+            ErrorCode.ACCESS_DENIED,
+            "Data connectors are disabled on this server",
+        )
+
+
 @connectors_bp.route("/api/data-loaders", methods=["GET"])
 def list_data_loaders():
     """Return available loader types + their param definitions.
@@ -935,6 +959,7 @@ def list_data_loaders():
     This is the discovery endpoint — tells the frontend what kinds of
     connectors can be created.
     """
+    _require_connectors_enabled()
     from data_formulator.data_loader import (
         DATA_LOADERS, DISABLED_LOADERS, PLUGIN_LOADERS, PLUGIN_ERRORS, PLUGIN_DIR,
     )
@@ -996,6 +1021,7 @@ def list_data_loaders():
 @connectors_bp.route("/api/data-loaders/discover-options", methods=["POST"])
 def discover_data_loader_options():
     """Discover values for one loader parameter after an explicit UI action."""
+    _require_connectors_enabled()
     from data_formulator.data_loader import DATA_LOADERS
 
     data = request.get_json() or {}
@@ -1337,6 +1363,7 @@ def create_connector():
 
     Persists to ``DATA_FORMULATOR_HOME/users/<identity>/connectors/<source_id>.json``.
     """
+    _require_connectors_enabled()
     from data_formulator.data_loader import DATA_LOADERS
 
     data = request.get_json() or {}

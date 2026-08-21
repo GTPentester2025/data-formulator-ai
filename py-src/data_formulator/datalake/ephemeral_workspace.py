@@ -178,3 +178,45 @@ class EphemeralWorkspaceManager(WorkspaceManager):
         if state is not None:
             self._touch(workspace_id)
         return state
+
+
+_SWEEPER_STARTED = False
+_SWEEPER_LOCK = threading.Lock()
+
+
+def start_expiry_sweeper() -> None:
+    """Run the TTL cleanup on a timer instead of only on the next request.
+
+    Cleanup normally piggybacks on workspace access, so an idle server keeps
+    expired data on disk until somebody happens to sign in. When the point of
+    the TTL is that data must not outlive a period of inactivity, waiting for
+    activity defeats it — this sweeps on a schedule regardless of traffic.
+
+    Idempotent: safe to call from every worker; only the first call starts a
+    thread.
+    """
+    global _SWEEPER_STARTED
+
+    with _SWEEPER_LOCK:
+        if _SWEEPER_STARTED:
+            return
+        _SWEEPER_STARTED = True
+
+    interval = _positive_float_env("EPHEMERAL_WORKSPACE_CLEANUP_INTERVAL_SECONDS", 1800)
+    interval = max(60.0, interval)
+
+    def _loop() -> None:
+        while True:
+            time.sleep(interval)
+            try:
+                removed = cleanup_ephemeral_workspaces(force=True)
+                if removed:
+                    logger.info("Expiry sweep removed %d workspace(s)", removed)
+            except Exception:
+                logger.exception("Workspace expiry sweep failed")
+
+    thread = threading.Thread(
+        target=_loop, name="df-workspace-expiry", daemon=True,
+    )
+    thread.start()
+    logger.info("Workspace expiry sweeper started (every %.0fs)", interval)

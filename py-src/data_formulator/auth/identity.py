@@ -63,6 +63,15 @@ def is_local_mode() -> bool:
     return _localhost_identity is not None
 
 
+def is_anonymous_allowed() -> bool:
+    """True when unauthenticated visitors may use the app.
+
+    False on a server configured for accounts only, where features built
+    around anonymous workspaces have nothing legitimate to act on.
+    """
+    return _allow_anonymous
+
+
 def _validate_identity_value(value: str, source: str) -> str:
     """Validate and return a trimmed identity value.
 
@@ -215,7 +224,11 @@ def get_identity_id() -> str:
             "X-Identity-Id header is required. Please refresh the page."
         )
 
-    raise ValueError("Authentication required. Please log in.")
+    # A real 401 rather than a bare ValueError: the frontend keys its
+    # redirect-to-login on the AUTH_REQUIRED code, and a ValueError surfaces
+    # as a generic 500 that it cannot act on.
+    from data_formulator.errors import AppError, ErrorCode
+    raise AppError(ErrorCode.AUTH_REQUIRED, "Sign in to continue")
 
 
 def get_auth_result() -> Optional[AuthResult]:

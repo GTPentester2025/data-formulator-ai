@@ -422,3 +422,4 @@ NUL
 
 # Package manager lock files (using yarn)
 package-lock.json
+.flask_secret

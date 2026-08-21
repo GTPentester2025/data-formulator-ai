@@ -133,8 +133,14 @@ class TestProviderDispatch:
         with app.test_request_context(
             headers={"X-Identity-Id": "some-uuid"}
         ):
-            with pytest.raises(ValueError, match="Authentication required"):
+            # AppError carrying AUTH_REQUIRED, not a bare ValueError: the
+            # frontend keys its sign-in prompt on that code, and a ValueError
+            # would reach the browser as an opaque 500.
+            from data_formulator.errors import AppError, ErrorCode
+
+            with pytest.raises(AppError) as excinfo:
                 get_identity_id()
+            assert excinfo.value.code == ErrorCode.AUTH_REQUIRED
 
 
 # ------------------------------------------------------------------

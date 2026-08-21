@@ -289,6 +289,22 @@ def _register_blueprints():
     if provider and provider.name == "github":
         from data_formulator.auth.gateways.github_gateway import github_bp
         app.register_blueprint(github_bp)
+    if provider and provider.name == "local":
+        from data_formulator.auth.gateways.local_auth_gateway import local_auth_bp
+        from data_formulator.auth.local_users import ensure_bootstrap_admin
+        app.register_blueprint(local_auth_bp)
+        # A fresh install has no accounts, so nobody could sign in to create
+        # the first one. Seed an administrator, and when its password was
+        # generated rather than configured, show it once.
+        generated = ensure_bootstrap_admin()
+        if generated:
+            admin_name = os.environ.get("DF_ADMIN_USERNAME", "admin")
+            logger.warning(
+                "\n%s\n  Created administrator '%s' with a one-time password:\n"
+                "      %s\n  Sign in and change it now - this is the only time "
+                "it is shown.\n%s",
+                "=" * 68, admin_name, generated, "=" * 68,
+            )
 
     # Register auth token management routes (always active)
     from data_formulator.auth.gateways.oidc_gateway import auth_tokens_bp
@@ -337,6 +353,29 @@ def _safety_checks():
             "LLM-generated code can read/write arbitrary files on the server. "
             "Set SANDBOX=docker or SANDBOX=local for production deployments."
         )
+
+    # Accounts without isolation would be theatre: a shared identity means a
+    # shared workspace. Localhost mode pins every request to one OS-derived
+    # identity, so it must not stay on once real accounts exist.
+    if os.environ.get('AUTH_PROVIDER', '').strip().lower() == 'local':
+        from data_formulator.auth.identity import is_local_mode
+        if is_local_mode():
+            logger.critical(
+                "SECURITY WARNING: AUTH_PROVIDER=local is set but the server is "
+                "bound to a loopback address, so single-user localhost mode is "
+                "active and EVERY visitor shares one workspace. Start with "
+                "--host 0.0.0.0 to give each account its own data."
+            )
+        if not os.environ.get('FLASK_SECRET_KEY'):
+            logger.warning(
+                "FLASK_SECRET_KEY is not set; a new signing key is generated at "
+                "each start, so everyone is signed out whenever the server "
+                "restarts. Set it to a stable random value."
+            )
+
+    if backend == 'ephemeral':
+        from data_formulator.datalake.ephemeral_workspace import start_expiry_sweeper
+        start_expiry_sweeper()
 
 
 # Register blueprints at module level so WSGI servers (gunicorn) pick up all routes.

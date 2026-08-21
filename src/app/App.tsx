@@ -82,6 +82,8 @@ import { DictTable } from '../components/ComponentType';
 import { AppDispatch } from './store';
 import dfLogo from '../assets/df-logo.svg';
 import { AnvilLoader } from '../components/AnvilLoader';
+import { LoginScreen } from '../views/LoginScreen';
+import type { LocalUser } from './localAuth';
 import { ModelSelectionButton } from '../views/ModelSelectionDialog';
 import { LogViewerDialog } from '../views/LogViewerDialog';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
@@ -1373,6 +1375,10 @@ export const AppFC: FC<AppFCProps> = function AppFC(appProps) {
 
     // Unified auth initialisation — driven by /api/auth/info and server IDENTITY
     const [authChecked, setAuthChecked] = useState(false);
+    // Set when this server holds the accounts (AUTH_PROVIDER=local): the
+    // signed-in account, or null while signed out.
+    const [localAccount, setLocalAccount] = useState<LocalUser | null>(null);
+    const [requiresLocalLogin, setRequiresLocalLogin] = useState(false);
     const [migrationBrowserId, setMigrationBrowserId] = useState<string | null>(null);
     const serverConfig = useSelector((state: DataFormulatorState) => state.serverConfig);
 
@@ -1396,7 +1402,28 @@ export const AppFC: FC<AppFCProps> = function AppFC(appProps) {
                     const { getAuthInfo, getOidcUser } = await import('./oidcConfig');
                     const info: AuthInfo | null = await getAuthInfo();
 
-                    if (info?.action === 'backend') {
+                    if (info?.action === 'form') {
+                        // Accounts held by this server — identity comes from the
+                        // login session cookie. With no session the login gate
+                        // renders instead of the app.
+                        try {
+                            const { fetchAuthStatus } = await import('./localAuth');
+                            const localStatus = await fetchAuthStatus();
+                            if (localStatus.authenticated && localStatus.user) {
+                                resolvedIdentity = {
+                                    type: 'user',
+                                    id: localStatus.user.username,
+                                    displayName: localStatus.user.username,
+                                };
+                                setLocalAccount(localStatus.user);
+                            }
+                        } catch {
+                            // not signed in — fall through
+                        }
+                        if (!resolvedIdentity) {
+                            setRequiresLocalLogin(true);
+                        }
+                    } else if (info?.action === 'backend') {
                         // Backend OIDC — identity from server session
                         try {
                             const { data: status } = await apiRequest(info.status_url || '/api/auth/oidc/status');
@@ -1657,7 +1684,15 @@ export const AppFC: FC<AppFCProps> = function AppFC(appProps) {
     return (
         <ThemeProvider theme={theme}>
             <LayoutProvider>
-                {configLoaded && authChecked ? (
+                {configLoaded && authChecked && requiresLocalLogin && !localAccount ? (
+                    <LoginScreen onSignedIn={(user) => {
+                        setLocalAccount(user);
+                        setRequiresLocalLogin(false);
+                        // Re-run bootstrap so the identity, workspaces and
+                        // server config all reflect the account just signed in.
+                        window.location.reload();
+                    }} />
+                ) : configLoaded && authChecked ? (
                     <RouterProvider router={router} />
                 ) : (
                     <>

@@ -1230,6 +1230,13 @@ def classify_and_raise_db_error(error: Exception) -> None:
     """
     from data_formulator.errors import AppError, ErrorCode
 
+    # An AppError already carries a deliberate code and a message written for
+    # the user — most importantly AUTH_REQUIRED, which the frontend keys its
+    # sign-in prompt on. Re-classifying it here would bury that as a generic
+    # internal error, so pass it through untouched.
+    if isinstance(error, AppError):
+        raise error
+
     logger.error("Database/workspace error", exc_info=error)
 
     error_msg = str(error)

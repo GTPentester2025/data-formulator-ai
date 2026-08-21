@@ -714,7 +714,13 @@
             "importing": "Importing workspaces…",
             "success": "Successfully imported {{count}} workspace(s).",
             "failed": "Import failed: {{message}}"
-        }
+        },
+        "signInPrompt": "Sign in to continue.",
+        "chooseNewPassword": "Choose a new password to continue.",
+        "newPassword": "New password",
+        "confirmPassword": "Confirm new password",
+        "savePassword": "Save password",
+        "passwordsDoNotMatch": "The two passwords do not match"
     },
     "supersetPanel": {
         "datasets": "Datasets",
@@ -1026,5 +1032,24 @@
         "optionSourceDesc": "The tables this result was derived from, one sheet each, so the steps are visible.",
         "cancel": "Cancel",
         "download": "Download"
+    },
+    "admin": {
+        "title": "Users",
+        "intro": "Each account keeps its own data. Administrators manage accounts here but cannot open anyone else's workspaces.",
+        "manageUsers": "Manage users",
+        "addUser": "Add user",
+        "initialPassword": "Initial password",
+        "role": "Role",
+        "roleUser": "user",
+        "roleAdmin": "admin",
+        "lastLogin": "Last sign-in",
+        "actions": "Actions",
+        "never": "never",
+        "you": "(you)",
+        "resetPassword": "Reset password",
+        "deleteUser": "Delete user and all their data",
+        "cannotDeleteSelf": "You cannot delete your own account",
+        "copyPassword": "Copy password",
+        "passwordIssued": "Password for {{username}}: {{password}} — give it to them now; it cannot be shown again."
     }
 }

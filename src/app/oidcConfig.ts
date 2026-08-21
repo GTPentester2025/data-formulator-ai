@@ -35,7 +35,9 @@ export interface OidcConfig {
 }
 
 export interface AuthInfo {
-    action: "frontend" | "backend" | "redirect" | "transparent" | "none";
+    /** "form" — accounts live on this server; collect a username and
+     *  password and POST them to `login_url`. */
+    action: "frontend" | "backend" | "redirect" | "transparent" | "form" | "none";
     label?: string;
     oidc?: {
         authority: string;

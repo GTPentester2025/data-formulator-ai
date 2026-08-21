@@ -133,3 +133,97 @@ def test_cleanup_lru_evicts_oldest_workspace(tmp_path, monkeypatch):
     assert cleanup_ephemeral_workspaces(force=True) == 1
     assert not oldest_dir.exists()
     assert newest_dir.exists()
+
+
+# ---------------------------------------------------------------------------
+# Inactivity expiry for signed-in accounts
+# ---------------------------------------------------------------------------
+
+class TestAccountDataExpiry:
+    """Data must not outlive the inactivity window, whoever owns it.
+
+    A server running on accounts stores everything under ``user:<name>``
+    identities. The TTL was originally aimed at anonymous visitors, so these
+    pin down that it applies to real accounts too — and that the sweeper runs
+    on a timer rather than waiting for the next visit.
+    """
+
+    def _make_workspace(self, identity: str, workspace_id: str, age_hours: float):
+        import os
+        import time
+
+        from data_formulator.datalake.ephemeral_workspace import (
+            get_ephemeral_workspaces_root,
+        )
+        from data_formulator.datalake.workspace_manager import WORKSPACE_META_FILENAME
+
+        root = get_ephemeral_workspaces_root(identity)
+        workspace_dir = root / workspace_id
+        workspace_dir.mkdir(parents=True, exist_ok=True)
+        (workspace_dir / "table.parquet").write_bytes(b"private-bytes")
+
+        stale = time.time() - age_hours * 3600
+        meta = workspace_dir / WORKSPACE_META_FILENAME
+        meta.write_text(
+            json.dumps({
+                "id": workspace_id,
+                "lastAccessedAt": datetime.fromtimestamp(
+                    stale, tz=timezone.utc,
+                ).isoformat(),
+            }),
+            encoding="utf-8",
+        )
+        os.utime(workspace_dir, (stale, stale))
+        return workspace_dir
+
+    def test_idle_account_data_is_removed_after_the_ttl(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("DATA_FORMULATOR_HOME", str(tmp_path))
+        monkeypatch.setenv("EPHEMERAL_WORKSPACE_TTL_HOURS", "2")
+
+        from data_formulator.datalake.ephemeral_workspace import (
+            cleanup_ephemeral_workspaces,
+        )
+
+        stale = self._make_workspace("user:alice", "old-ws", age_hours=3)
+        fresh = self._make_workspace("user:alice", "new-ws", age_hours=0.25)
+
+        cleanup_ephemeral_workspaces(force=True)
+
+        assert not stale.exists(), "data idle past the TTL should be deleted"
+        assert fresh.exists(), "recently used data must survive"
+
+    def test_expiry_does_not_reach_into_another_account(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("DATA_FORMULATOR_HOME", str(tmp_path))
+        monkeypatch.setenv("EPHEMERAL_WORKSPACE_TTL_HOURS", "2")
+
+        from data_formulator.datalake.ephemeral_workspace import (
+            cleanup_ephemeral_workspaces,
+        )
+
+        alice_stale = self._make_workspace("user:alice", "ws", age_hours=5)
+        bob_fresh = self._make_workspace("user:bob", "ws", age_hours=0.1)
+
+        cleanup_ephemeral_workspaces(force=True)
+
+        assert not alice_stale.exists()
+        assert bob_fresh.exists(), "one account's expiry must not touch another's"
+
+    def test_sweeper_starts_once(self, monkeypatch):
+        import data_formulator.datalake.ephemeral_workspace as module
+
+        monkeypatch.setattr(module, "_SWEEPER_STARTED", False)
+        started: list[str] = []
+
+        class _FakeThread:
+            def __init__(self, *args, **kwargs):
+                started.append(kwargs.get("name", ""))
+
+            def start(self):
+                pass
+
+        monkeypatch.setattr(module.threading, "Thread", _FakeThread)
+
+        module.start_expiry_sweeper()
+        module.start_expiry_sweeper()
+
+        assert started == ["df-workspace-expiry"], "repeat calls must not stack threads"

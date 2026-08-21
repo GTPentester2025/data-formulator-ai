@@ -90,6 +90,25 @@ def save_session():
     return json_ok({"id": ws_id, "saved_at": datetime.utcnow().isoformat()})
 
 
+def _reject_cross_identity_access() -> None:
+    """Block the anonymous-workspace adoption routes when anonymous access is off.
+
+    These routes let a signed-in user read, move, or delete any *browser*
+    identity's workspaces by supplying its UUID. That is intentional while
+    anonymous use is allowed — it is how a visitor keeps their work after
+    signing up. Once anonymous access is disabled there are no legitimate
+    anonymous workspaces, and the routes are only a way for one account to
+    reach data that is not its own.
+    """
+    from data_formulator.auth.identity import is_anonymous_allowed
+
+    if not is_anonymous_allowed():
+        raise AppError(
+            ErrorCode.ACCESS_DENIED,
+            "Anonymous workspaces are disabled on this server",
+        )
+
+
 @session_bp.route("/list", methods=["GET"])
 def list_sessions():
     """List all workspaces for the current user.
@@ -102,6 +121,7 @@ def list_sessions():
 
     source = request.args.get("source_identity", "").strip()
     if source:
+        _reject_cross_identity_access()
         if not identity_id.startswith("user:"):
             raise AppError(ErrorCode.ACCESS_DENIED, "source_identity requires authenticated user")
         if not source.startswith("browser:"):
@@ -311,6 +331,7 @@ def migrate_workspaces():
     (new data files + metadata entries added).  The anonymous source
     workspaces are deleted after a successful move.
     """
+    _reject_cross_identity_access()
     target_id = get_identity_id()
     if not target_id.startswith("user:"):
         raise AppError(ErrorCode.ACCESS_DENIED, "Migration requires an authenticated user")
@@ -349,6 +370,7 @@ def cleanup_anonymous():
     Used by the "Start Fresh" migration option so the anonymous data
     does not linger and trigger another migration prompt later.
     """
+    _reject_cross_identity_access()
     target_id = get_identity_id()
     if not target_id.startswith("user:"):
         raise AppError(ErrorCode.ACCESS_DENIED, "Cleanup requires an authenticated user")
