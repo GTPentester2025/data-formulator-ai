@@ -423,3 +423,11 @@ NUL
 # Package manager lock files (using yarn)
 package-lock.json
 .flask_secret
+
+# The built UI IS tracked, deliberately. The portal VM is a locked-down RHEL box
+# where the frontend build is the most fragile step: it needs Node 20, reachable
+# npm/yarn registries and roughly 8 GB of heap. Shipping the artifact lets the
+# deploy copy it and start, instead of rebuilding it on a server that cannot.
+# Rebuild and commit it whenever the UI changes:  yarn build
+!py-src/data_formulator/dist/
+!py-src/data_formulator/dist/**

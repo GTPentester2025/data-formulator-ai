@@ -1,0 +1,4 @@
+
+# Shipped build output: byte-for-byte as vite emitted it. Without this, git
+# line-ending normalisation would rewrite the bundles on checkout.
+py-src/data_formulator/dist/** -text
