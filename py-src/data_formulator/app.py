@@ -97,12 +97,17 @@ _disable_database = os.environ.get('DISABLE_DATABASE', 'false').lower() == 'true
 _default_ws_backend = os.environ.get('WORKSPACE_BACKEND', 'local')
 if _disable_database and _default_ws_backend == 'local':
     _default_ws_backend = 'ephemeral'
+def _env_flag(name: str, default: str = 'false') -> bool:
+    """Read a boolean switch from the environment ("true" wins, case-insensitively)."""
+    return os.environ.get(name, default).lower() == 'true'
+
+
 app.config['CLI_ARGS'] = {
     'host': os.environ.get('HOST', '127.0.0.1'),
     'sandbox': os.environ.get('SANDBOX', 'local'),
-    'disable_display_keys': _disable_database or os.environ.get('DISABLE_DISPLAY_KEYS', 'false').lower() == 'true',
-    'disable_data_connectors': _disable_database or os.environ.get('DISABLE_DATA_CONNECTORS', 'false').lower() == 'true',
-    'disable_custom_models': _disable_database or os.environ.get('DISABLE_CUSTOM_MODELS', 'false').lower() == 'true',
+    'disable_display_keys': _disable_database or _env_flag('DISABLE_DISPLAY_KEYS'),
+    'disable_data_connectors': _disable_database or _env_flag('DISABLE_DATA_CONNECTORS'),
+    'disable_custom_models': _disable_database or _env_flag('DISABLE_CUSTOM_MODELS'),
     'max_display_rows': int(os.environ.get('MAX_DISPLAY_ROWS', '10000')),
     'scratch_max_bytes': int(os.environ.get('SCRATCH_MAX_SIZE_MB', '1024')) * 1024 * 1024,
     'scratch_max_file_bytes': int(os.environ.get('SCRATCH_MAX_FILE_SIZE_MB', '20')) * 1024 * 1024,
@@ -492,16 +497,21 @@ def parse_args() -> argparse.Namespace:
         choices=['local', 'docker'],
         help="Python code execution backend: 'local' (default, isolated subprocess with audit hooks), "
              "'docker' (maximum isolation, requires Docker)")
-    parser.add_argument("--disable-display-keys", action='store_true', default=False,
-        help="Whether disable displaying keys in the frontend UI, recommended to turn on if you host the app not just for yourself.")
+    # These three default from the environment, not from False. run_app() rebuilds
+    # CLI_ARGS from the parsed args, so a plain `default=False` would overwrite the
+    # env-derived values set at import — silently ignoring the very variables
+    # MULTIUSER.md tells a shared-server operator to set, and leaving connectors
+    # and API keys visible in the UI of a server meant to hide them.
+    parser.add_argument("--disable-display-keys", action='store_true', default=_env_flag('DISABLE_DISPLAY_KEYS'),
+        help="Whether disable displaying keys in the frontend UI, recommended to turn on if you host the app not just for yourself. Env: DISABLE_DISPLAY_KEYS")
     parser.add_argument("--disable-database", action='store_true', default=False,
         help="Multi-user anonymous preset: enables ephemeral workspace, disables data connectors, "
              "disables custom LLM endpoints, and hides API keys. Equivalent to setting "
              "--workspace-backend=ephemeral --disable-data-connectors --disable-custom-models --disable-display-keys.")
-    parser.add_argument("--disable-data-connectors", action='store_true', default=False,
+    parser.add_argument("--disable-data-connectors", action='store_true', default=_env_flag('DISABLE_DATA_CONNECTORS'),
         help="Disable external data connectors (MySQL, PostgreSQL, etc.). "
              "Recommended for multi-user anonymous deployments to prevent credential exposure.")
-    parser.add_argument("--disable-custom-models", action='store_true', default=False,
+    parser.add_argument("--disable-custom-models", action='store_true', default=_env_flag('DISABLE_CUSTOM_MODELS'),
         help="Prevent users from adding custom LLM endpoints via the UI. "
              "Only server-configured models will be available.")
     parser.add_argument("--max-display-rows", type=int,
