@@ -39,23 +39,9 @@ dependencies = [
     "xlrd",
     "openpyxl>=3.1.0",
     "lxml", # pandas.read_html web table extraction
-    "yfinance",
-    # Data-loader deps (all included by default; try/except keeps things safe)
-    "pymongo", # mongodb
-    "azure-cosmos", # cosmosdb
-    "azure-storage-blob", # azure_blob
-    "azure-identity", # azure_blob, kusto
-    "azure-kusto-data", # kusto
-    "azure-keyvault-secrets", # kusto
-    "pymysql", # mysql
-    "clickhouse-connect", # clickhouse
-    "mssql-python>=1.11.0", # mssql
-    "psycopg2-binary", # postgresql
-    "boto3", # s3, athena
-    "google-cloud-bigquery", # bigquery
-    "google-auth", # bigquery
-    "db-dtypes", # bigquery
-    "databricks-sql-connector", # databricks
+    # Data-loader dependencies were removed along with the loaders themselves.
+    # This build accepts uploaded files only: no database drivers, no cloud
+    # SDKs, no BI clients, no market-data client.
     # SSO / Auth deps
     "PyJWT[crypto]>=2.8.0", # OIDC JWT verification (includes cryptography)
     "requests", # GitHub OAuth code exchange, Superset API calls

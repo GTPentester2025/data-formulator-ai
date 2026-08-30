@@ -7,6 +7,8 @@ openai
 python-dotenv
 # litellm 1.92+ is Rust/maturin (manylinux-only wheels) — hangs on Windows/macOS
 # without a Rust toolchain. Pin below it; >=1.84.0 keeps the CVE fix.
+# NOTE: every release in this range declares Requires-Python <3.14, so the app
+# must run on 3.11–3.13.
 litellm>=1.84.0,<1.92
 duckdb
 numpy
@@ -18,24 +20,13 @@ pyarrow>=13.0.0
 xlrd
 openpyxl>=3.1.0
 lxml
-yfinance
 
-# Data-loader deps (all included; try/except at import time keeps things safe)
-pymongo
-azure-cosmos
-azure-storage-blob
-azure-identity
-azure-kusto-data
-azure-keyvault-secrets
-pymysql
-clickhouse-connect
-mssql-python>=1.11.0
-psycopg2-binary
-boto3
-google-cloud-bigquery
-google-auth
-db-dtypes
-databricks-sql-connector
+# File upload only. Every external data-loader dependency was removed with the
+# loaders themselves — no database drivers (mysql, postgres, mssql, clickhouse,
+# mongo, cosmos), no cloud SDKs (boto3, azure-*, google-cloud-bigquery,
+# databricks), no BI clients (superset) and no market-data client (yfinance).
+# Nothing here opens an outbound connection on the app's behalf except the LLM
+# endpoint the user configures.
 
 # SSO / Auth deps
 PyJWT[crypto]>=2.8.0

@@ -269,9 +269,9 @@ def _register_blueprints():
     # Import session routes
     from data_formulator.routes.sessions import session_bp
 
-    # Import demo stream routes
-    from data_formulator.routes.demo_stream import demo_stream_bp, limiter as demo_stream_limiter
-    demo_stream_limiter.init_app(app)
+    # The demo-stream blueprint (live earthquake / weather / stock feeds pulled
+    # from USGS, open-meteo and Yahoo Finance) is gone: this deployment makes no
+    # outbound calls of its own and carries no preloaded data.
 
     # Import server-log inspection routes (local-mode gated)
     from data_formulator.routes.logs import logs_bp
@@ -281,7 +281,6 @@ def _register_blueprints():
     app.register_blueprint(tables_bp)
     app.register_blueprint(agent_bp)
     app.register_blueprint(session_bp)
-    app.register_blueprint(demo_stream_bp)
     app.register_blueprint(logs_bp)
     app.register_blueprint(model_endpoints_bp)
 
@@ -342,7 +341,7 @@ def _register_blueprints():
         from data_formulator.data_connector import register_data_connectors
         register_data_connectors(app)
     if app.config['CLI_ARGS'].get('disable_data_connectors'):
-        print("  External data connectors disabled (DISABLE_DATA_CONNECTORS=true) - sample datasets remain available", flush=True)
+        print("  External data connectors disabled (DISABLE_DATA_CONNECTORS=true) - file upload only", flush=True)
 
 
 def _safety_checks():

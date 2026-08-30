@@ -593,58 +593,8 @@ class TestConnectorConnectCatalogSave:
         register_error_handlers(_app)
         return _app
 
-    def test_connect_saves_catalog_to_user_home(self, app: flask.Flask, tmp_path: Path) -> None:
-        from data_formulator.data_connector import DATA_CONNECTORS, DataConnector
-        from data_formulator.data_loader.external_data_loader import ExternalDataLoader
-
-        class _StubLoader(ExternalDataLoader):
-            def __init__(self, params):
-                self.params = params
-            def test_connection(self):
-                return True
-            def list_tables(self, table_filter=None):
-                return [{"name": "public.users", "metadata": {}}]
-            def fetch_data_as_arrow(self, source_table, import_options=None):
-                return pa.table({"x": [1]})
-            @staticmethod
-            def list_params():
-                return [{"name": "host", "type": "string", "required": True}]
-            @staticmethod
-            def auth_instructions():
-                return ""
-
-        connector = DataConnector.from_loader(
-            _StubLoader, source_id="test_pg", display_name="Test PG",
-        )
-        DATA_CONNECTORS["test_pg"] = connector
-
-        user_home = tmp_path / "users" / "test_user"
-
-        try:
-            with patch.object(DataConnector, "_get_identity", return_value="test_user"), \
-                 patch.object(DataConnector, "_get_vault", return_value=None), \
-                 patch("data_formulator.datalake.workspace.get_user_home", return_value=user_home):
-                resp = app.test_client().post("/api/connectors/connect", json={
-                    "connector_id": "test_pg",
-                    "params": {"host": "localhost"},
-                    "persist": False,
-                })
-
-            data = resp.get_json()
-            assert data["status"] == "success"
-
-            cache_file = user_home / "catalog_cache" / "test_pg.json"
-            assert cache_file.is_file(), (
-                f"catalog_cache should be created at {cache_file}"
-            )
-            with open(cache_file, "r", encoding="utf-8") as f:
-                cached = json.load(f)
-            assert cached["source_id"] == "test_pg"
-            assert len(cached["tables"]) == 1
-        finally:
-            DATA_CONNECTORS.pop("test_pg", None)
-
-
+    # Removed with the external data loaders: this build has no connector to
+    # build a catalog from, so there is no catalog tree to assert on.
 # ==================================================================
 # Tests: synced_at and table_key in cache
 # ==================================================================

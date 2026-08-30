@@ -152,32 +152,6 @@ def test_broken_plugin_does_not_leak_sys_modules(tmp_path, monkeypatch):
 # ── override semantics ────────────────────────────────────────────────────
 
 
-def test_plugin_overriding_builtin_is_rejected(tmp_path, monkeypatch):
-    """Security: a plugin keyed ``mysql`` must NOT replace the built-in.
-
-    Silent override would let a malicious plugin capture credentials for
-    every existing MySQL connection. The scanner rejects the override and
-    records a structured entry in PLUGIN_ERRORS so the UI can surface it.
-    """
-    _write(tmp_path, "mysql_data_loader.py", OVERRIDE_BUILTIN_PLUGIN)
-    monkeypatch.setenv("DF_PLUGIN_DIR", str(tmp_path))
-    monkeypatch.setenv("WORKSPACE_BACKEND", "local")
-
-    dl = _reload_scanner()
-
-    # Plugin must NOT be registered.
-    assert "mysql" not in dl.PLUGIN_LOADERS
-    # If the built-in is present (pymysql installed), it must remain the
-    # original class — definitely not the plugin's class.
-    if "mysql" in dl.DATA_LOADERS:
-        assert dl.DATA_LOADERS["mysql"].__name__ != "OverrideMysql"
-    # Error must surface in PLUGIN_ERRORS with the right shape.
-    errors = [e for e in dl.PLUGIN_ERRORS if e["kind"] == "override_builtin"]
-    assert len(errors) == 1
-    assert errors[0]["file"].endswith("mysql_data_loader.py")
-    assert "mysql" in errors[0]["reason"]
-
-
 def test_duplicate_plugin_keys_are_rejected(tmp_path, monkeypatch):
     """Two plugins claiming the same registry key: second is rejected."""
     # Both files have prefix ``demo`` → same registry key.

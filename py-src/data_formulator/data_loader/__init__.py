@@ -59,23 +59,13 @@ _log = logging.getLogger(__name__)
 # (registry_key, module_path, class_name, pip_package)
 # To add a new loader, just append a tuple here.
 # ---------------------------------------------------------------------------
-_LOADER_SPECS: list[tuple[str, str, str, str]] = [
-    ("mysql",      "data_formulator.data_loader.mysql_data_loader",      "MySQLDataLoader",      "pymysql"),
-    ("clickhouse", "data_formulator.data_loader.clickhouse_data_loader", "ClickHouseDataLoader", "clickhouse-connect"),
-    ("mssql",      "data_formulator.data_loader.mssql_data_loader",      "MSSQLDataLoader",      "mssql-python"),
-    ("postgresql", "data_formulator.data_loader.postgresql_data_loader",  "PostgreSQLDataLoader", "psycopg2-binary"),
-    ("kusto",      "data_formulator.data_loader.kusto_data_loader",      "KustoDataLoader",      "azure-kusto-data"),
-    ("databricks", "data_formulator.data_loader.databricks_data_loader", "DatabricksDataLoader", "databricks-sql-connector"),
-    ("s3",         "data_formulator.data_loader.s3_data_loader",         "S3DataLoader",         "boto3"),
-    ("azure_blob", "data_formulator.data_loader.azure_blob_data_loader", "AzureBlobDataLoader",  "azure-storage-blob"),
-    ("mongodb",    "data_formulator.data_loader.mongodb_data_loader",    "MongoDBDataLoader",    "pymongo"),
-    ("cosmosdb",   "data_formulator.data_loader.cosmosdb_data_loader",  "CosmosDBDataLoader",   "azure-cosmos"),
-    ("bigquery",   "data_formulator.data_loader.bigquery_data_loader",   "BigQueryDataLoader",   "google-cloud-bigquery"),
-    ("athena",     "data_formulator.data_loader.athena_data_loader",     "AthenaDataLoader",     "boto3"),
-    ("superset",   "data_formulator.data_loader.superset_data_loader",   "SupersetLoader",       "requests"),
-    ("local_folder", "data_formulator.data_loader.local_folder_data_loader", "LocalFolderDataLoader", "pyarrow"),
-    ("sample_datasets", "data_formulator.data_loader.sample_datasets_loader", "SampleDatasetsLoader", "requests"),
-]
+# Deliberately EMPTY. This deployment accepts uploaded files only: every built-in
+# loader was removed, so there is no path from the UI to a database, an object
+# store, a BI server or the machine's own filesystem, and no dataset is fetched
+# from the internet. The registry machinery below is kept because the discovery
+# endpoint and the plugin mechanism still use it — with nothing to register, both
+# report an empty catalogue.
+_LOADER_SPECS: list[tuple[str, str, str, str]] = []
 
 # ---------------------------------------------------------------------------
 # Phase 1: load built-in loaders
@@ -87,59 +77,7 @@ PLUGIN_LOADERS: dict[str, str] = {}    # key -> absolute source file path
 PLUGIN_ERRORS: list[dict] = []         # rejected plugin attempts (override / duplicate)
 _BUILTIN_KEYS: frozenset[str] = frozenset(spec[0] for spec in _LOADER_SPECS)
 
-_BUILTIN_CATALOG_POLICIES: dict[str, CatalogCachePolicy] = {
-    "sample_datasets": CatalogCachePolicy(
-        listing_ttl_seconds=86_400,
-        metadata_ttl_seconds=86_400,
-        refresh_cost="free",
-        automatic_refresh="always",
-        automatic_refresh_kind="full",
-    ),
-    "local_folder": CatalogCachePolicy(
-        listing_ttl_seconds=0,
-        metadata_ttl_seconds=0,
-        refresh_cost="local",
-        automatic_refresh="while_connected",
-        minimum_retry_seconds=5,
-    ),
-    **{
-        key: CatalogCachePolicy(
-            listing_ttl_seconds=3_600,
-            metadata_ttl_seconds=21_600,
-            refresh_cost="cheap",
-            automatic_refresh="while_connected",
-            automatic_refresh_kind="full",
-        )
-        for key in ("mysql", "postgresql", "mssql", "clickhouse")
-    },
-    **{
-        key: CatalogCachePolicy(
-            listing_ttl_seconds=900,
-            metadata_ttl_seconds=21_600,
-            refresh_cost="moderate",
-            automatic_refresh="while_connected",
-        )
-        for key in ("s3", "azure_blob")
-    },
-    **{
-        key: CatalogCachePolicy(
-            listing_ttl_seconds=7_200,
-            metadata_ttl_seconds=43_200,
-            refresh_cost="moderate",
-            automatic_refresh="while_connected",
-        )
-        for key in ("databricks", "bigquery", "athena")
-    },
-    **{
-        key: CatalogCachePolicy(
-            listing_ttl_seconds=21_600 if key == "kusto" else 7_200,
-            metadata_ttl_seconds=86_400 if key == "kusto" else 43_200,
-            refresh_cost="expensive",
-            automatic_refresh="never",
-        )
-        for key in ("kusto", "mongodb", "cosmosdb", "superset")
-    },
-}
+_BUILTIN_CATALOG_POLICIES: dict[str, CatalogCachePolicy] = {}
 
 def _scan_package_loaders() -> None:
     """Import built-in loaders from ``_LOADER_SPECS``."""
@@ -147,7 +85,9 @@ def _scan_package_loaders() -> None:
         try:
             mod = importlib.import_module(module_path)
             loader_class = getattr(mod, cls_name)
-            loader_class.CATALOG_CACHE_POLICY = _BUILTIN_CATALOG_POLICIES[key]
+            policy = _BUILTIN_CATALOG_POLICIES.get(key)
+            if policy is not None:
+                loader_class.CATALOG_CACHE_POLICY = policy
             DATA_LOADERS[key] = loader_class
         except ImportError as exc:
             hint = f"pip install {pip_pkg}"

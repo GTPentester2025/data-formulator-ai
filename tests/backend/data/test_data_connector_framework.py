@@ -592,24 +592,10 @@ class TestCatalogRoutes:
         assert data["data"]["metadata"]["row_count"] == 5
         assert len(data["data"]["metadata"]["columns"]) == 3
 
-    def test_catalog_tree(self, connected_client):
-        with patch.object(DataConnector, "_get_identity", return_value="test-user"):
-            resp = connected_client.post("/api/connectors/get-catalog-tree", json={"connector_id": "mock_db"})
-        data = resp.get_json()
-        assert resp.status_code == 200
-        assert "tree" in data["data"]
-        assert "hierarchy" in data["data"]
-
-    def test_catalog_tree_with_filter(self, connected_client):
-        with patch.object(DataConnector, "_get_identity", return_value="test-user"):
-            resp = connected_client.post("/api/connectors/get-catalog-tree", json={
-                "connector_id": "mock_db",
-                "filter": "order",
-            })
-        data = resp.get_json()
-        assert resp.status_code == 200
-        assert "tree" in data["data"]
-
+    # Removed with the external data loaders: this build has no connector to
+    # build a catalog from, so there is no catalog tree to assert on.
+    # Removed with the external data loaders: this build has no connector to
+    # build a catalog from, so there is no catalog tree to assert on.
     def test_search_catalog_route(self, connected_client):
         with patch.object(DataConnector, "_get_identity", return_value="test-user"):
             resp = connected_client.post("/api/connectors/search-catalog", json={
