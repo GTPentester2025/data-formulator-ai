@@ -1,4 +1,0 @@
-# No demo workspaces in this deployment. The upstream demos (movies, stock
-# prices, gas prices, global energy, unemployment) were removed along with the
-# sample-dataset loader: this server carries no preloaded data. The file is kept
-# so the UI's fetch succeeds and simply renders an empty list.

@@ -57,7 +57,6 @@ import { ModelSelectionButton } from './ModelSelectionDialog';
 import { UnifiedDataUploadDialog, UploadTabType, DataLoadMenu, ConnectorInstance } from './UnifiedDataUploadDialog';
 import { ReportView } from './ReportView';
 import { DataSourceSidebar } from './DataSourceSidebar';
-import { ExampleSession, exampleSessions, ExampleSessionCard, fetchExampleSessions } from './ExampleSessions';
 import { useDataRefresh, useDerivedTableRefresh } from '../app/useDataRefresh';
 import { useTranslation } from 'react-i18next';
 import { fetchWithIdentity, getUrls, CONNECTOR_URLS } from '../app/utils';
@@ -140,14 +139,6 @@ export const DataFormulatorFC = ({ }) => {
         setPageConnectors([]);
         refreshPageConnectors();
     }, [refreshPageConnectors, identityKey]);
-
-    // ── Demo sessions (loaded from manifest, fallback to hardcoded) ─────
-    const [demoSessions, setDemoSessions] = useState<ExampleSession[]>(exampleSessions);
-    useEffect(() => {
-        fetchExampleSessions().then(sessions => {
-            if (sessions.length > 0) setDemoSessions(sessions);
-        });
-    }, []);
 
     // ── Workspace list (shown on landing page) ────────────────────
     const [savedWorkspaces, setSavedWorkspaces] = useState<WorkspaceSummary[]>([]);
@@ -387,48 +378,6 @@ export const DataFormulatorFC = ({ }) => {
         dispatch(dfActions.queueAnalystTask({ text, images, attachments }));
     };
 
-    const handleLoadExampleSession = async (session: ExampleSession) => {
-        dispatch(dfActions.setSessionLoading({ loading: true, label: t('messages.loadingExample', { title: session.title }) }));
-
-        dispatch(dfActions.addMessages({
-            timestamp: Date.now(),
-            type: 'info',
-            component: 'data formulator',
-            value: t('messages.loadingExample', { title: session.title }),
-        }));
-
-        try {
-            // Fetch the workspace zip
-            const res = await fetch(session.workspace);
-            if (!res.ok) throw new Error(`Failed to fetch ${session.workspace}`);
-            const blob = await res.blob();
-            const file = new File([blob], `${session.id}.zip`, { type: 'application/zip' });
-
-            // Import via the standard workspace import flow (parquet + state)
-            const wsId = generateSessionId();
-            // Set workspace ID first so fetchWithIdentity sends X-Workspace-Id header
-            dispatch(dfActions.setActiveWorkspace({ id: wsId, displayName: session.title }));
-            const state = await importWorkspace(file, wsId, session.title);
-            dispatch(dfActions.loadState({ ...state, activeWorkspace: { id: wsId, displayName: session.title } }));
-
-            dispatch(dfActions.addMessages({
-                timestamp: Date.now(),
-                type: 'success',
-                component: 'data formulator',
-                value: t('messages.loadSuccess', { title: session.title }),
-            }));
-        } catch (error: any) {
-            console.error('Error loading session:', error);
-            dispatch(dfActions.addMessages({
-                timestamp: Date.now(),
-                type: 'error',
-                component: 'data formulator',
-                value: t('messages.loadFailed', { title: session.title, error: error.message }),
-            }));
-        } finally {
-            dispatch(dfActions.setSessionLoading({ loading: false }));
-        }
-    };
 
     useEffect(() => {
         document.title = toolName;
@@ -888,28 +837,6 @@ export const DataFormulatorFC = ({ }) => {
                     connectors={pageConnectors}
                 />
             </Box>
-            </Box>
-
-            {/* Demos — promoted ahead of "Your Sessions" on the hosted
-                demo, since first-time visitors won't have any sessions
-                yet and demos are the most engaging entry point. */}
-            <Box sx={{mt: 3}}>
-                <Typography sx={{ color: alpha(theme.palette.text.primary, 0.76), fontSize: textVar.md, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', textAlign: 'left', mb: 2 }}>
-                    {t('landing.demos')}
-                </Typography>
-                <Box sx={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                    gap: 1.5,
-                }}>
-                    {demoSessions.map((session) => (
-                        <ExampleSessionCard
-                            key={session.id}
-                            session={session}
-                            onClick={() => handleLoadExampleSession(session)}
-                        />
-                    ))}
-                </Box>
             </Box>
 
             {/* ── Saved workspaces section ──────────────────────────── */}

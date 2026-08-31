@@ -123,7 +123,6 @@
     },
     "landing": {
         "tagline": "用 AI Agent 驱动可视化探索数据。",
-        "demos": "示例",
         "demoBannerBody": "这是一个演示站点！试用下方示例或上传文件。要处理大型数据集、连接数据库、链接本地文件夹、创建持久化分析会话、使用自定义模型并管理用户，请查看",
         "demoBannerCta": "安装指南",
         "demoBannerSuffix": "。",

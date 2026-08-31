@@ -123,7 +123,6 @@
     },
     "landing": {
         "tagline": "Explore data with visualizations, powered by AI agents.",
-        "demos": "Demos",
         "demoBannerBody": "This is a demo site! Try the examples below or upload files. To work with large datasets, connect to databases, link local folders, create persisted analysis sessions, use custom models, and manage users, check the ",
         "demoBannerCta": "installation guide",
         "demoBannerSuffix": ".",
