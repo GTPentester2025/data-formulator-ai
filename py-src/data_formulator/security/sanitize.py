@@ -147,12 +147,22 @@ def classify_llm_error(exc: Exception) -> str:
     """Return a safe, user-friendly message for an LLM / external-API error.
 
     The function matches ``str(exc)`` against known error patterns and
-    returns a **pre-defined** human-readable message.  No text from the
-    original exception is ever included in the return value.
+    returns a **pre-defined** human-readable message.  No text from a
+    third-party exception is ever included in the return value.
+
+    The exception is an exception: an error we raised ourselves, carrying
+    ``is_safe_message``, is already a diagnosis written for this user and is
+    passed through whole. Re-classifying it would replace "the endpoint
+    refused the request for lack of credentials, and this model is configured
+    without an API key" with "Authentication failed — please check your API
+    key", which points at a key that was never set.
 
     Falls back to a generic ``"Model request failed"`` for unknown errors.
     The caller is responsible for logging the full exception server-side.
     """
+    if getattr(exc, "is_safe_message", False):
+        return str(exc)
+
     text = str(exc).lower()
     for pattern, safe_msg in _LLM_ERROR_PATTERNS:
         if re.search(pattern, text):

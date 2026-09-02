@@ -117,7 +117,14 @@ class EndpointCapabilityError(RuntimeError):
     Distinct from a transport failure: retrying the same call another way will
     not help, so :meth:`Client._dispatch` re-raises it instead of falling back
     to a buffered request.
+
+    The message is written here, for this user, and quotes nothing from the
+    provider, so it reaches the browser intact rather than being re-classified
+    into a generic one.
     """
+
+    #: Read by ``security.sanitize.classify_llm_error``.
+    is_safe_message = True
 
 
 def _guard_stream(chunks):

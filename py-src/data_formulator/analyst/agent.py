@@ -499,10 +499,15 @@ class AnalystAgent:
                     # is fatal; the tool-round backstop also lands here.
                     if action_reason == "llm_error":
                         final_status = "llm_error"
+                        # The code is only a label for the case where we have
+                        # nothing better to say. Sending it alongside a real
+                        # diagnosis would bury it: the frontend prefers the
+                        # translated code over the message, so "Request timed
+                        # out — check connectivity" arrived as "LLM API error".
                         yield self._error_event(
                             iteration,
                             action_error or "LLM API error",
-                            message_code="agent.llmApiError",
+                            message_code="" if action_error else "agent.llmApiError",
                         )
                         self._log_session_end(rlog, final_status, iteration, total_llm_calls, session_start_time)
                         return
