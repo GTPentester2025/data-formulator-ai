@@ -20,8 +20,20 @@ pytestmark = [pytest.mark.backend]
 SAMPLE_ENV = {
     "OPENAI_ENABLED": "true",
     "OPENAI_API_KEY": "sk-secret-key-12345",
+    "OPENAI_API_BASE": "https://api.openai.com/v1",
     "OPENAI_MODELS": "gpt-4o",
 }
+
+
+def _as_admin():
+    # Configuring a model the server does not already publish is an
+    # administrator action, so tests that pass a caller-supplied config have to
+    # say which caller they mean.
+    return patch("data_formulator.auth.roles.is_admin", return_value=True)
+
+
+def _as_ordinary_user():
+    return patch("data_formulator.auth.roles.is_admin", return_value=False)
 
 
 # ---------------------------------------------------------------------------
@@ -29,13 +41,13 @@ SAMPLE_ENV = {
 # ---------------------------------------------------------------------------
 
 class TestGetClientGlobalResolution:
-    """get_client() must resolve real credentials from model_registry
-    when the model config has is_global=True."""
+    """get_client() must resolve real credentials from model_registry for a
+    model the server publishes, and refuse anything else from a non-admin."""
 
     @patch.dict(os.environ, SAMPLE_ENV, clear=True)
     def test_global_model_gets_real_api_key(self):
-        """A global model config (no api_key from frontend) should be
-        resolved to the full config with the real api_key."""
+        """A model named in the registry resolves to the full server-side
+        config, key included -- and needs no special privilege to use."""
         registry = ModelRegistry()
 
         with patch("data_formulator.routes.agents.model_registry", registry):
@@ -43,7 +55,7 @@ class TestGetClientGlobalResolution:
 
             client = get_client({
                 "id": "global-openai-gpt-4o",
-                "endpoint": "openai",
+                "endpoint": "custom",
                 "model": "gpt-4o",
                 "is_global": True,
             })
@@ -51,24 +63,65 @@ class TestGetClientGlobalResolution:
             assert client.params.get("api_key") == "sk-secret-key-12345"
 
     @patch.dict(os.environ, SAMPLE_ENV, clear=True)
-    def test_user_model_keeps_own_credentials(self):
-        """A non-global (user-added) model should use its own api_key,
-        not touch the registry."""
+    def test_registry_config_wins_over_the_request_body(self):
+        """The id identifies a server model; a request must not be able to keep
+        the id and swap the endpoint underneath it."""
         registry = ModelRegistry()
 
         with patch("data_formulator.routes.agents.model_registry", registry):
             from data_formulator.routes.agents import get_client
 
             client = get_client({
+                "id": "global-openai-gpt-4o",
+                "endpoint": "custom",
+                "model": "gpt-4o",
+                "api_key": "sk-attacker",
+                "api_base": "https://attacker-listener.example/v1",
+            })
+
+            assert client.params.get("api_key") == "sk-secret-key-12345"
+            assert client.params.get("api_base") == "https://api.openai.com/v1"
+
+    @patch.dict(os.environ, SAMPLE_ENV, clear=True)
+    def test_admin_model_keeps_own_credentials(self):
+        """An administrator may still point at an endpoint of their choosing."""
+        registry = ModelRegistry()
+
+        with patch("data_formulator.routes.agents.model_registry", registry), _as_admin():
+            from data_formulator.routes.agents import get_client
+
+            client = get_client({
                 "id": "user-custom-model",
-                "endpoint": "openai",
+                "endpoint": "custom",
                 "model": "gpt-4o",
                 "api_key": "sk-user-own-key",
-                "api_base": "",
+                "api_base": "https://gateway.internal/v1",
                 "api_version": "",
             })
 
             assert client.params.get("api_key") == "sk-user-own-key"
+
+    @patch.dict(os.environ, SAMPLE_ENV, clear=True)
+    def test_non_admin_cannot_name_an_unconfigured_endpoint(self):
+        """Model configuration is an operator decision: a non-admin request
+        carrying its own api_base and key is refused, so nobody can spend the
+        server's outbound access on an endpoint of their choosing."""
+        registry = ModelRegistry()
+
+        with patch("data_formulator.routes.agents.model_registry", registry), _as_ordinary_user():
+            from data_formulator.routes.agents import get_client
+
+            with pytest.raises(AppError, match="administrator") as exc:
+                get_client({
+                    "id": "user-custom-model",
+                    "endpoint": "custom",
+                    "model": "gpt-4o",
+                    "api_key": "sk-user-own-key",
+                    "api_base": "https://gateway.internal/v1",
+                })
+
+            assert exc.value.code == ErrorCode.ACCESS_DENIED
+            assert exc.value.get_http_status() == 403
 
     @patch.dict(os.environ, SAMPLE_ENV, clear=True)
     def test_global_claim_for_unregistered_id_is_rejected(self):
@@ -88,10 +141,10 @@ class TestGetClientGlobalResolution:
             with pytest.raises(AppError, match="Unknown global model") as exc:
                 get_client({
                     "id": "global-nonexistent-model",
-                    "endpoint": "openai",
+                    "endpoint": "custom",
                     "model": "nonexistent",
                     "api_key": "sk-fallback",
-                    "api_base": "",
+                    "api_base": "https://gateway.internal/v1",
                     "api_version": "",
                     "is_global": True,
                 })
@@ -110,13 +163,13 @@ class TestGetClientGlobalResolution:
         accepted even with the allowlist enforced."""
         registry = ModelRegistry()
 
-        with patch("data_formulator.routes.agents.model_registry", registry):
+        with patch("data_formulator.routes.agents.model_registry", registry), _as_admin():
             from data_formulator.routes.agents import get_client
 
             with pytest.raises(AppError) as exc:
                 get_client({
                     "id": "nonexistent-xyz",
-                    "endpoint": "azure",
+                    "endpoint": "custom",
                     "model": "gpt-4",
                     "api_key": "",
                     "api_base": "https://attacker-listener.example/",
@@ -130,17 +183,18 @@ class TestGetClientGlobalResolution:
         {**SAMPLE_ENV, "DF_ALLOWED_API_BASES": "https://api.openai.com/*"},
         clear=True,
     )
-    def test_user_model_api_base_is_still_validated(self):
-        """Without the is_global claim the allowlist applies as before."""
+    def test_admin_model_api_base_is_still_validated(self):
+        """The allowlist binds administrators too: it is the operator's own
+        statement about where this server may connect."""
         registry = ModelRegistry()
 
-        with patch("data_formulator.routes.agents.model_registry", registry):
+        with patch("data_formulator.routes.agents.model_registry", registry), _as_admin():
             from data_formulator.routes.agents import get_client
 
             with pytest.raises(AppError, match="allowlist") as exc:
                 get_client({
                     "id": "user-custom-model",
-                    "endpoint": "azure",
+                    "endpoint": "custom",
                     "model": "gpt-4",
                     "api_key": "",
                     "api_base": "https://attacker-listener.example/",
@@ -161,7 +215,7 @@ class TestGetClientGlobalResolution:
 
             get_client({
                 "id": "global-openai-gpt-4o",
-                "endpoint": "openai",
+                "endpoint": "custom",
                 "model": "gpt-4o",
                 "is_global": True,
             })

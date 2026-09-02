@@ -1,8 +1,8 @@
 """Unit tests for data_formulator.agents.client_utils.Client.
 
 Tests cover the pure-logic parts that don't require a live LLM:
-- Model name prefixing for gemini / anthropic / ollama
-- Ollama api_base normalisation (trailing /api stripping)
+- The single supported provider (custom OpenAI-compatible) and its rejections
+- Model name prefixing and api_base normalisation
 - Image block stripping helpers (_strip_image_blocks, _strip_images_from_messages)
 - Image request detection (_messages_contain_images)
 - Image deserialise error detection (_is_image_deserialize_error)
@@ -20,123 +20,110 @@ pytestmark = [pytest.mark.backend]
 
 
 # ---------------------------------------------------------------------------
-# Model name prefixing
+# One provider only
+# ---------------------------------------------------------------------------
+
+class TestOnlyCustomEndpointIsAccepted:
+    """Every model is a custom OpenAI-compatible endpoint. The hosted-provider
+    shortcuts are gone, so a config naming one must be refused rather than
+    quietly routed somewhere the operator never allowlisted."""
+
+    @pytest.mark.parametrize("endpoint", ["openai", "azure", "anthropic", "gemini", "ollama"])
+    def test_removed_providers_are_rejected(self, endpoint):
+        with pytest.raises(ValueError, match="only calls custom OpenAI-compatible"):
+            Client(endpoint, "some-model", api_key="k", api_base="https://h/v1")
+
+    def test_missing_endpoint_defaults_to_custom(self):
+        """A saved model from before the change may carry no endpoint at all."""
+        c = Client("", "my-model", api_key="k", api_base="https://h/v1")
+        assert c.endpoint == "custom"
+
+    def test_api_base_is_required(self):
+        with pytest.raises(ValueError, match="API base URL is required"):
+            Client("custom", "my-model", api_key="k")
+
+
+# ---------------------------------------------------------------------------
+# Model name prefixing and api_base normalisation
 # ---------------------------------------------------------------------------
 
 class TestModelNamePrefixing:
-    def test_gemini_prefix_added_when_missing(self):
-        c = Client("gemini", "gemini-1.5-pro", api_key="k")
-        assert c.model == "gemini/gemini-1.5-pro"
+    def test_model_prefixed_for_openai_transport(self):
+        c = Client("custom", "gpt-4o", api_key="k", api_base="https://h/v1")
+        assert c.model == "openai/gpt-4o"
 
-    def test_gemini_prefix_not_doubled(self):
-        c = Client("gemini", "gemini/gemini-1.5-pro", api_key="k")
-        assert c.model == "gemini/gemini-1.5-pro"
-
-    def test_anthropic_prefix_added_when_missing(self):
-        c = Client("anthropic", "claude-3-opus-20240229", api_key="k")
-        assert c.model == "anthropic/claude-3-opus-20240229"
-
-    def test_anthropic_prefix_not_doubled(self):
-        c = Client("anthropic", "anthropic/claude-3", api_key="k")
-        assert c.model == "anthropic/claude-3"
-
-    def test_ollama_prefix_added_when_missing(self):
-        c = Client("ollama", "llama3", api_base="http://localhost:11434")
-        assert c.model == "ollama/llama3"
-
-    def test_ollama_prefix_not_doubled(self):
-        c = Client("ollama", "ollama/llama3", api_base="http://localhost:11434")
-        assert c.model == "ollama/llama3"
-
-    def test_openai_model_prefixed(self):
-        c = Client("openai", "gpt-4o", api_key="k")
+    def test_prefix_not_doubled(self):
+        c = Client("custom", "openai/gpt-4o", api_key="k", api_base="https://h/v1")
         assert c.model == "openai/gpt-4o"
 
 
-# ---------------------------------------------------------------------------
-# Ollama api_base normalisation
-# ---------------------------------------------------------------------------
+class TestApiBaseNormalisation:
+    def test_version_suffix_added_when_missing(self):
+        c = Client("custom", "m", api_key="k", api_base="https://gateway.internal")
+        assert c.params["api_base"] == "https://gateway.internal/v1"
 
-class TestOllamaApiBaseNormalisation:
-    def test_trailing_slash_stripped(self):
-        c = Client("ollama", "llama3", api_base="http://localhost:11434/")
-        assert not c.params["api_base"].endswith("/")
+    def test_existing_version_preserved(self):
+        c = Client("custom", "m", api_key="k", api_base="https://gateway.internal/v1")
+        assert c.params["api_base"] == "https://gateway.internal/v1"
 
-    def test_trailing_api_stripped(self):
-        """Users sometimes copy-paste the URL ending in /api — we strip it."""
-        c = Client("ollama", "llama3", api_base="http://localhost:11434/api")
-        assert not c.params["api_base"].endswith("/api")
-        assert c.params["api_base"] == "http://localhost:11434"
-
-    def test_trailing_api_slash_stripped(self):
-        c = Client("ollama", "llama3", api_base="http://localhost:11434/api/")
-        assert c.params["api_base"] == "http://localhost:11434"
-
-    def test_non_api_suffix_preserved(self):
-        c = Client("ollama", "llama3", api_base="http://myserver:11434/ollama")
-        assert c.params["api_base"] == "http://myserver:11434/ollama"
-
-    def test_default_base_when_none(self):
-        c = Client("ollama", "llama3")
-        assert c.params["api_base"] == "http://localhost:11434"
-
-
-# ---------------------------------------------------------------------------
-# Azure credential selection
-# ---------------------------------------------------------------------------
-
-class TestAzureCredentialSelection:
-    def test_desktop_keyless_model_uses_azure_cli_credential(self, monkeypatch):
-        cli_credential = object()
-        monkeypatch.setenv("DATA_FORMULATOR_DESKTOP", "1")
-        monkeypatch.setattr(client_utils, "AzureCliCredential", lambda: cli_credential)
-        monkeypatch.setattr(
-            client_utils,
-            "DefaultAzureCredential",
-            lambda: pytest.fail("desktop mode must not select an ambient credential"),
-        )
-        monkeypatch.setattr(
-            client_utils,
-            "get_bearer_token_provider",
-            lambda credential, scope: (credential, scope),
-        )
-
-        client = Client(
-            "azure",
-            "deployment-name",
-            api_base="https://example.openai.azure.com",
-        )
-
-        assert client.params["azure_ad_token_provider"] == (
-            cli_credential,
-            "https://cognitiveservices.azure.com/.default",
-        )
+    def test_pasted_chat_completions_path_stripped(self):
+        c = Client("custom", "m", api_key="k",
+                   api_base="https://gateway.internal/v1/chat/completions")
+        assert c.params["api_base"] == "https://gateway.internal/v1"
 
     def test_blank_api_version_is_not_defaulted(self):
-        client = Client(
-            "azure",
-            "deployment-name",
-            api_key="key",
-            api_base="https://example.openai.azure.com/",
-        )
-
-        assert client.params["api_base"] == "https://example.openai.azure.com"
-        assert "api_version" not in client.params
+        c = Client("custom", "m", api_key="k", api_base="https://h/v1")
+        assert "api_version" not in c.params
 
     def test_explicit_api_version_is_preserved(self):
-        client = Client(
-            "azure",
-            "deployment-name",
-            api_key="key",
-            api_base="https://example.openai.azure.com",
-            api_version="2025-04-01-preview",
-        )
+        c = Client("custom", "m", api_key="k", api_base="https://h/v1",
+                   api_version="2025-04-01-preview")
+        assert c.params["api_version"] == "2025-04-01-preview"
 
-        assert client.params["api_version"] == "2025-04-01-preview"
 
-    def test_api_base_is_required(self):
-        with pytest.raises(ValueError, match="Azure API base URL is required"):
-            Client("azure", "deployment-name", api_key="key")
+class TestApiKeyHandling:
+    def test_key_is_passed_through(self):
+        c = Client("custom", "m", api_key="sk-real", api_base="https://h/v1")
+        assert c.params["api_key"] == "sk-real"
+
+    def test_blank_key_uses_placeholder(self):
+        """LiteLLM's OpenAI transport refuses to send without an api_key, so a
+        keyless endpoint gets a placeholder it never inspects."""
+        c = Client("custom", "m", api_base="https://h/v1")
+        assert c.params["api_key"] == "not-needed"
+
+    def test_placeholder_turns_a_401_into_a_missing_key_message(self):
+        c = Client("custom", "m", api_base="https://h/v1")
+        assert c._is_missing_key_error("AuthenticationError: Missing Authentication header")
+
+    def test_real_key_401_is_not_reported_as_missing(self):
+        c = Client("custom", "m", api_key="sk-real", api_base="https://h/v1")
+        assert not c._is_missing_key_error("AuthenticationError: Missing Authentication header")
+
+
+class TestTlsVerification:
+    def test_verification_on_by_default(self, monkeypatch):
+        monkeypatch.delenv("DF_LLM_CA_BUNDLE", raising=False)
+        monkeypatch.delenv("DF_LLM_INSECURE_SKIP_VERIFY", raising=False)
+        c = Client("custom", "m", api_key="k", api_base="https://h/v1")
+        assert "ssl_verify" not in c.params
+
+    def test_ca_bundle_keeps_verification_on(self, monkeypatch):
+        monkeypatch.delenv("DF_LLM_INSECURE_SKIP_VERIFY", raising=False)
+        monkeypatch.setenv("DF_LLM_CA_BUNDLE", "/etc/ssl/internal-ca.pem")
+        c = Client("custom", "m", api_key="k", api_base="https://h/v1")
+        assert c.params["ssl_verify"] == "/etc/ssl/internal-ca.pem"
+
+    def test_insecure_flag_disables_verification(self, monkeypatch):
+        monkeypatch.setenv("DF_LLM_INSECURE_SKIP_VERIFY", "1")
+        c = Client("custom", "m", api_key="k", api_base="https://h/v1")
+        assert c.params["ssl_verify"] is False
+
+    def test_insecure_flag_wins_over_ca_bundle(self, monkeypatch):
+        monkeypatch.setenv("DF_LLM_CA_BUNDLE", "/etc/ssl/internal-ca.pem")
+        monkeypatch.setenv("DF_LLM_INSECURE_SKIP_VERIFY", "true")
+        c = Client("custom", "m", api_key="k", api_base="https://h/v1")
+        assert c.params["ssl_verify"] is False
 
 
 # ---------------------------------------------------------------------------
@@ -145,7 +132,7 @@ class TestAzureCredentialSelection:
 
 class TestStripImageBlocks:
     def setup_method(self):
-        self.client = Client("openai", "gpt-4o", api_key="k")
+        self.client = Client("custom", "gpt-4o", api_key="k", api_base="https://h/v1")
 
     def test_string_content_unchanged(self):
         result = self.client._strip_image_blocks("hello")
@@ -191,7 +178,7 @@ class TestStripImageBlocks:
 
 class TestStripImagesFromMessages:
     def setup_method(self):
-        self.client = Client("openai", "gpt-4o", api_key="k")
+        self.client = Client("custom", "gpt-4o", api_key="k", api_base="https://h/v1")
 
     def _multimodal_messages(self):
         return [
@@ -240,7 +227,7 @@ class TestStripImagesFromMessages:
 
 class TestIsImageDeserializeError:
     def setup_method(self):
-        self.client = Client("openai", "gpt-4o", api_key="k")
+        self.client = Client("custom", "gpt-4o", api_key="k", api_base="https://h/v1")
 
     def test_image_url_expected_text_detected(self):
         err = "Error: image_url content part was sent but expected `text` content"
@@ -279,7 +266,7 @@ class TestIsImageDeserializeError:
 
 class TestMessagesContainImages:
     def setup_method(self):
-        self.client = Client("openai", "gpt-4o", api_key="k")
+        self.client = Client("custom", "gpt-4o", api_key="k", api_base="https://h/v1")
 
     def test_multimodal_message_detected(self):
         messages = [
@@ -304,29 +291,31 @@ class TestMessagesContainImages:
 
 class TestFromConfig:
     def test_creates_client_from_dict(self):
-        cfg = {"endpoint": "openai", "model": "gpt-4o", "api_key": "mykey"}
+        cfg = {"endpoint": "custom", "model": "gpt-4o", "api_key": "mykey",
+               "api_base": "https://h/v1"}
         c = Client.from_config(cfg)
-        assert c.endpoint == "openai"
+        assert c.endpoint == "custom"
         assert c.model == "openai/gpt-4o"
         assert c.params["api_key"] == "mykey"
 
     def test_strips_whitespace_from_values(self):
-        cfg = {"endpoint": "  openai  ", "model": "  gpt-4o  ", "api_key": "  key  "}
+        cfg = {"endpoint": "  custom  ", "model": "  gpt-4o  ", "api_key": "  key  ",
+               "api_base": "  https://h/v1  "}
         c = Client.from_config(cfg)
-        assert c.endpoint == "openai"
+        assert c.endpoint == "custom"
         assert c.model == "openai/gpt-4o"
         assert c.params["api_key"] == "key"
 
     def test_optional_fields_absent_when_empty(self):
-        cfg = {"endpoint": "openai", "model": "gpt-4o", "api_key": "k"}
+        cfg = {"endpoint": "custom", "model": "gpt-4o", "api_key": "k",
+               "api_base": "https://h/v1"}
         c = Client.from_config(cfg)
-        # api_base and api_version should not be set when absent
-        assert "api_base" not in c.params or c.params.get("api_base", "") == ""
+        assert "api_version" not in c.params
 
-    def test_gemini_prefix_applied_via_from_config(self):
+    def test_removed_provider_in_a_saved_config_is_rejected(self):
         cfg = {"endpoint": "gemini", "model": "gemini-pro", "api_key": "k"}
-        c = Client.from_config(cfg)
-        assert c.model.startswith("gemini/")
+        with pytest.raises(ValueError, match="only calls custom OpenAI-compatible"):
+            Client.from_config(cfg)
 
 
 # ---------------------------------------------------------------------------
@@ -535,11 +524,7 @@ class TestOpenAICompatibleBaseNormalization:
         assert self.norm("https://res.openai.azure.com/openai/v1") == \
             "https://res.openai.azure.com/openai/v1"
 
-    def test_openai_endpoint_normalizes_api_base(self):
-        c = Client("openai", "gpt-4o", api_key="k",
+    def test_client_normalizes_a_pasted_chat_completions_url(self):
+        c = Client("custom", "gpt-4o", api_key="k",
                    api_base="https://h/v1/chat/completions")
         assert c.params["api_base"] == "https://h/v1"
-
-    def test_openai_endpoint_without_api_base_unchanged(self):
-        c = Client("openai", "gpt-4o", api_key="k")
-        assert "api_base" not in c.params

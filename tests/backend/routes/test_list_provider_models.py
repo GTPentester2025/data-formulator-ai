@@ -45,43 +45,26 @@ class TestParseModelList:
 
 
 class TestModelListRequests:
-    def test_custom_normalizes_base_and_sends_both_auth_headers(self):
+    """One provider, one request shape: ``GET <normalized base>/models``."""
+
+    def test_normalizes_base_and_sends_both_auth_headers(self):
         (url, headers), = _model_list_requests("custom", "sk-x", "https://host/openai", "")
         assert url == "https://host/openai/v1/models"
         # Azure-style gateways read `api-key`; everyone else reads Bearer.
         assert headers["Authorization"] == "Bearer sk-x"
         assert headers["api-key"] == "sk-x"
 
-    def test_openai_defaults_to_the_public_endpoint(self):
-        (url, _), = _model_list_requests("openai", "sk-x", "", "")
-        assert url == "https://api.openai.com/v1/models"
+    def test_existing_version_segment_is_kept(self):
+        (url, _), = _model_list_requests("custom", "sk-x", "https://host/v1", "")
+        assert url == "https://host/v1/models"
 
-    def test_ollama_tries_native_then_openai_compatible(self):
-        attempts = _model_list_requests("ollama", "", "http://localhost:11434/api", "")
-        assert [u for u, _ in attempts] == [
-            "http://localhost:11434/api/tags",
-            "http://localhost:11434/v1/models",
-        ]
+    def test_blank_key_sends_no_auth_header(self):
+        """A keyless endpoint must not be handed an empty bearer token."""
+        (_, headers), = _model_list_requests("custom", "", "http://localhost:11434/v1", "")
+        assert headers == {}
 
-    def test_anthropic_uses_its_own_auth_headers(self):
-        (url, headers), = _model_list_requests("anthropic", "sk-ant", "", "")
-        assert url == "https://api.anthropic.com/v1/models"
-        assert headers["x-api-key"] == "sk-ant"
-        assert "anthropic-version" in headers
-
-    def test_gemini_passes_the_key_as_a_query_parameter(self):
-        (url, _), = _model_list_requests("gemini", "key123", "", "")
-        assert url.endswith("key=key123")
-
-    def test_azure_requires_a_base_url(self):
+    def test_base_url_is_required(self):
+        """There is no public default to fall back on: without a base URL there
+        is nowhere to ask."""
         with pytest.raises(AppError):
-            _model_list_requests("azure", "k", "", "")
-
-    def test_azure_uses_the_supplied_api_version(self):
-        attempts = _model_list_requests("azure", "k", "https://res.openai.azure.com", "2025-01-01")
-        assert attempts[0][0] == "https://res.openai.azure.com/openai/models?api-version=2025-01-01"
-        assert attempts[0][1]["api-key"] == "k"
-
-    def test_unknown_provider_is_rejected(self):
-        with pytest.raises(AppError):
-            _model_list_requests("bogus", "k", "", "")
+            _model_list_requests("custom", "k", "", "")

@@ -25,7 +25,6 @@ import {
     FormControl,
     Select,
     SelectChangeEvent,
-    MenuItem,
     OutlinedInput,
     Paper,
     Box,
@@ -33,8 +32,6 @@ import {
     Checkbox,
     Switch,
     FormControlLabel,
-    ToggleButton,
-    ToggleButtonGroup,
     Accordion,
     AccordionSummary,
     AccordionDetails,
@@ -76,6 +73,11 @@ const simpleHash = (str: string): string => {
 
 const CONFIGURED_SECRET_MASK = '******';
 
+// This deployment calls exactly one kind of provider: a custom
+// OpenAI-compatible endpoint. There is no provider picker because there is
+// nothing to pick — the API base URL is what decides where a model lives.
+const CUSTOM_ENDPOINT = 'custom';
+
 interface ModelSelectionButtonProps {
     appearance?: 'toolbar' | 'inline';
 }
@@ -102,21 +104,21 @@ export const ModelSelectionButton: React.FC<ModelSelectionButtonProps> = ({ appe
     const [detailModelId, setDetailModelId] = useState<string | undefined>(selectedModelId);
     const [isEditingDetails, setIsEditingDetails] = useState(false);
     const [showKeys, setShowKeys] = useState<boolean>(false);
-    const [providerModelOptions, setProviderModelOptions] = useState<{[key: string]: string[]}>({
-        'openai': [],
-        'azure': [],
-        'anthropic': [],
-        'gemini': [],
-        'ollama': [],
-        'custom': []
-    });
-    // Models fetched live from the endpoint the user is configuring, keyed by
-    // provider so switching provider doesn't show the previous one's list.
-    const [fetchedModels, setFetchedModels] = useState<{[key: string]: string[]}>({});
+    // Model ids already configured on this server, offered as suggestions.
+    const [knownModelIds, setKnownModelIds] = useState<string[]>([]);
+    // Model ids the endpoint being configured just reported.
+    const [fetchedModelIds, setFetchedModelIds] = useState<string[]>([]);
     const [loadingProviderModels, setLoadingProviderModels] = useState(false);
     const [providerModelsMessage, setProviderModelsMessage] = useState<string>("");
     const [providerModelsError, setProviderModelsError] = useState(false);
     const serverConfig = useSelector((state: DataFormulatorState) => state.serverConfig);
+
+    // Which endpoints exist, and with whose credentials, is an operator
+    // decision: every model route rejects a non-admin, so the configuration
+    // controls are not rendered for one either. Everybody else picks from the
+    // models the administrator has already loaded.
+    const canConfigure = serverConfig.IS_ADMIN === true && !serverConfig.DISABLE_CUSTOM_MODELS;
+    const newEndpoint = CUSTOM_ENDPOINT;
 
     let updateModelStatus = (model: ModelConfig, status: 'ok' | 'error' | 'testing' | 'unknown', message: string) => {
         dispatch(dfActions.updateModelStatus({id: model.id, status, message}));
@@ -127,50 +129,18 @@ export const ModelSelectionButton: React.FC<ModelSelectionButtonProps> = ({ appe
 
     // Helper functions for slot management
     const [tempSelectedModelId, setTempSelectedModelId] = useState<string | undefined>(selectedModelId);
-    const [newEndpoint, setNewEndpoint] = useState<string>(""); // openai, azure, ollama etc
     const [newModel, setNewModel] = useState<string>("");
     const [newApiKey, setNewApiKey] = useState<string>("");
     const [newApiBase, setNewApiBase] = useState<string>("");
     const [newApiVersion, setNewApiVersion] = useState<string>("");
-    const [azureAuthMethod, setAzureAuthMethod] = useState<'azure_cli' | 'api_key'>('azure_cli');
     const [isAddingModel, setIsAddingModel] = useState(false);
     const [newModelError, setNewModelError] = useState("");
     const [newModelDiagnostic, setNewModelDiagnostic] = useState<ApiError | null>(null);
     const [modelLogsOpen, setModelLogsOpen] = useState(false);
     const [rememberedEndpoints, setRememberedEndpoints] = useState<RememberedModelEndpoint[]>([]);
-    const [azureCliStatus, setAzureCliStatus] = useState<{
-        installed: boolean;
-        signed_in: boolean;
-        account: { user?: string; tenant_id?: string } | null;
-    } | null>(null);
-    const [azureCliLoginPending, setAzureCliLoginPending] = useState(false);
-
-    const usesAzureCli = serverConfig.IS_LOCAL_MODE && (
-        (newEndpoint === 'azure' && azureAuthMethod === 'azure_cli')
-        || globalModels.some(model => model.auth_mode === 'azure_identity')
-        || models.some(model => model.endpoint === 'azure' && !model.api_key)
-    );
 
     useEffect(() => {
-        if (!modelDialogOpen || !usesAzureCli) {
-            setAzureCliStatus(null);
-            return;
-        }
-        let cancelled = false;
-        apiRequest('/api/local/azure-status', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({}),
-        }).then(({ data }) => {
-            if (!cancelled) setAzureCliStatus(data);
-        }).catch(() => {
-            if (!cancelled) setAzureCliStatus(null);
-        });
-        return () => { cancelled = true; };
-    }, [modelDialogOpen, usesAzureCli]);
-
-    useEffect(() => {
-        if (!modelDialogOpen) return;
+        if (!modelDialogOpen || !canConfigure) return;
         apiRequest<RememberedModelEndpoint[]>(getUrls().MODEL_ENDPOINTS)
             .then(({ data }) => setRememberedEndpoints(data))
             .catch(() => setRememberedEndpoints([]));
@@ -196,55 +166,12 @@ export const ModelSelectionButton: React.FC<ModelSelectionButtonProps> = ({ appe
         }).catch(() => undefined);
     };
 
-    const handleAzureCliLogin = async () => {
-        setAzureCliLoginPending(true);
-        try {
-            const { data } = await apiRequest('/api/local/azure-login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({}),
-            });
-            setAzureCliStatus({ installed: true, ...data });
-        } catch (error) {
-            const message = error instanceof ApiRequestError
-                ? error.apiError.message
-                : error instanceof Error ? error.message : String(error);
-            setNewModelDiagnostic(error instanceof ApiRequestError ? error.apiError : {
-                code: 'CLIENT_ERROR',
-                message,
-                retry: false,
-            });
-            setNewModelError(message);
-        } finally {
-            setAzureCliLoginPending(false);
-        }
-    };
-
-    // Build provider→model dropdown options from globalModels (already in Redux).
-    // This runs whenever globalModels updates (phase 1 instant list → phase 2 with statuses).
+    // Model ids already published by the server, offered alongside whatever the
+    // endpoint reports so an admin rarely has to type one out.
     useEffect(() => {
-        const modelsByProvider: {[key: string]: string[]} = {
-            'openai': [],
-            'azure': [],
-            'anthropic': [],
-            'gemini': [],
-            'ollama': [],
-            'custom': []
-        };
-
-        globalModels.forEach((modelConfig: any) => {
-            const provider = modelConfig.endpoint;
-            const model = modelConfig.model;
-
-            if (provider && model && !modelsByProvider[provider]) {
-                modelsByProvider[provider] = [];
-            }
-            if (provider && model && !modelsByProvider[provider].includes(model)) {
-                modelsByProvider[provider].push(model);
-            }
-        });
-
-        setProviderModelOptions(modelsByProvider);
+        setKnownModelIds(Array.from(new Set(
+            globalModels.map((modelConfig: any) => modelConfig.model).filter(Boolean),
+        )));
     }, [globalModels]);
 
 
@@ -283,16 +210,14 @@ export const ModelSelectionButton: React.FC<ModelSelectionButtonProps> = ({ appe
             });
     }
 
-    // Whatever the endpoint just told us, plus models already configured for
-    // this provider, so both sources are offered in one list.
-    const modelOptionsForEndpoint = useMemo(() => {
-        const live = fetchedModels[newEndpoint] || [];
-        const known = providerModelOptions[newEndpoint] || [];
-        return Array.from(new Set([...live, ...known]));
-    }, [fetchedModels, providerModelOptions, newEndpoint]);
+    // Whatever the endpoint just told us, plus models already configured here,
+    // so both sources are offered in one list.
+    const modelOptionsForEndpoint = useMemo(
+        () => Array.from(new Set([...fetchedModelIds, ...knownModelIds])),
+        [fetchedModelIds, knownModelIds]);
 
     const handleLoadProviderModels = () => {
-        if (loadingProviderModels || !newEndpoint) return;
+        if (loadingProviderModels) return;
         setLoadingProviderModels(true);
         setProviderModelsMessage("");
         setProviderModelsError(false);
@@ -310,7 +235,7 @@ export const ModelSelectionButton: React.FC<ModelSelectionButtonProps> = ({ appe
             }),
         }).then(({ data }) => {
             const models = data.models || [];
-            setFetchedModels(prev => ({ ...prev, [newEndpoint]: models }));
+            setFetchedModelIds(models);
             setProviderModelsMessage(t('model.loadModelsFound', {
                 defaultValue: '{{count}} models available — pick one from the list.',
                 count: models.length,
@@ -324,15 +249,15 @@ export const ModelSelectionButton: React.FC<ModelSelectionButtonProps> = ({ appe
         });
     };
 
-    let readyToTest = newModel && (newApiKey || newApiBase) && !isAddingModel;
+    // A base URL is the one thing a custom endpoint cannot do without; the
+    // key is optional because some internal endpoints take none.
+    let readyToTest = newModel && newApiBase && !isAddingModel;
 
     const resetNewModelForm = () => {
-        setNewEndpoint("");
         setNewModel("");
         setNewApiKey("");
         setNewApiBase("");
         setNewApiVersion("");
-        setAzureAuthMethod('azure_cli');
         setNewModelError("");
         setNewModelDiagnostic(null);
     };
@@ -348,9 +273,7 @@ export const ModelSelectionButton: React.FC<ModelSelectionButtonProps> = ({ appe
             api_key: newApiKey,
             api_base: newApiBase,
             api_version: newApiVersion,
-            auth_mode: newEndpoint === 'azure'
-                ? (azureAuthMethod === 'azure_cli' ? 'azure_identity' : 'key')
-                : undefined,
+            auth_mode: 'key',
             id,
         };
 
@@ -389,16 +312,10 @@ export const ModelSelectionButton: React.FC<ModelSelectionButtonProps> = ({ appe
     const loadModelDetails = (model: ModelConfig) => {
         setDetailModelId(model.id);
         setTempSelectedModelId(model.id);
-        setNewEndpoint(model.endpoint);
         setNewModel(model.model);
         setNewApiBase(model.api_base || '');
         setNewApiVersion(model.api_version || '');
         setNewApiKey(model.is_global ? '' : model.api_key || '');
-        setAzureAuthMethod(
-            model.endpoint === 'azure' && model.auth_mode !== 'key' && !model.api_key
-                ? 'azure_cli'
-                : 'api_key'
-        );
         setNewModelError('');
         setNewModelDiagnostic(null);
         setIsEditingDetails(false);
@@ -407,7 +324,9 @@ export const ModelSelectionButton: React.FC<ModelSelectionButtonProps> = ({ appe
     const startNewModel = () => {
         setDetailModelId(undefined);
         resetNewModelForm();
-        setIsEditingDetails(true);
+        // Opening the dialog with no models selected must not drop a non-admin
+        // into a form the server would refuse to save.
+        setIsEditingDetails(canConfigure);
     };
 
     const editModelDetails = () => {
@@ -440,11 +359,11 @@ export const ModelSelectionButton: React.FC<ModelSelectionButtonProps> = ({ appe
                     size="small"
                     options={rememberedEndpoints}
                     value={null}
-                    getOptionLabel={(option) => `${option.endpoint} / ${option.model}`}
+                    getOptionLabel={(option) => option.model}
                     renderOption={(props, option) => (
-                        <li {...props} key={`${option.endpoint}-${option.model}-${option.api_base}-${option.api_version}`}>
+                        <li {...props} key={`${option.model}-${option.api_base}-${option.api_version}`}>
                             <Box sx={{ minWidth: 0 }}>
-                                <Typography variant="body2">{option.endpoint} / {option.model}</Typography>
+                                <Typography variant="body2">{option.model}</Typography>
                                 {option.api_base && (
                                     <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
                                         {option.api_base}
@@ -455,12 +374,10 @@ export const ModelSelectionButton: React.FC<ModelSelectionButtonProps> = ({ appe
                     )}
                     onChange={(_event, option) => {
                         if (!option) return;
-                        setNewEndpoint(option.endpoint);
                         setNewModel(option.model);
                         setNewApiBase(option.api_base);
                         setNewApiVersion(option.api_version);
                         setNewApiKey('');
-                        setAzureAuthMethod(option.auth_mode === 'azure_identity' ? 'azure_cli' : 'api_key');
                         setNewModelError('');
                         setNewModelDiagnostic(null);
                     }}
@@ -469,24 +386,41 @@ export const ModelSelectionButton: React.FC<ModelSelectionButtonProps> = ({ appe
                     )}
                 />
             )}
-            <TextField
-                select
-                fullWidth
-                size="small"
-                disabled={!isEditingDetails}
-                label={t('model.provider')}
-                value={newEndpoint}
-                onChange={(event) => {
-                    const provider = event.target.value;
-                    setNewEndpoint(provider);
-                    setNewModelError("");
-                    setNewModelDiagnostic(null);
-                }}
-            >
-                {['openai', 'azure', 'ollama', 'anthropic', 'gemini', 'custom'].map(provider => (
-                    <MenuItem key={provider} value={provider}>{provider === 'custom' ? 'custom (OpenAI-compatible)' : provider}</MenuItem>
-                ))}
-            </TextField>
+            {(isEditingDetails || Boolean(newApiBase)) && (
+                <TextField
+                    fullWidth
+                    size="small"
+                    disabled={!isEditingDetails}
+                    label={t('model.apiBase')}
+                    value={newApiBase}
+                    onChange={(event) => setNewApiBase(event.target.value)}
+                    placeholder="https://your-gateway.example.com/v1"
+                    helperText={isEditingDetails
+                        ? t('model.apiBaseHint', {
+                            defaultValue: 'The OpenAI-compatible base URL. /chat/completions is appended for you.',
+                        })
+                        : undefined}
+                    autoComplete="off"
+                />
+            )}
+
+            {(isEditingDetails || detailHasConfiguredApiKey) && (
+                <TextField
+                    fullWidth
+                    size="small"
+                    disabled={!isEditingDetails}
+                    type={isEditingDetails && !showKeys ? 'password' : 'text'}
+                    label={t('model.apiKey')}
+                    value={isEditingDetails ? newApiKey : CONFIGURED_SECRET_MASK}
+                    onChange={(event) => setNewApiKey(event.target.value)}
+                    helperText={isEditingDetails
+                        ? t('model.apiKeyHint', {
+                            defaultValue: 'Leave blank only if the endpoint takes no key — a blank key against one that needs it comes back as a 401.',
+                        })
+                        : undefined}
+                    autoComplete="off"
+                />
+            )}
 
             {/* Model picker: type an id, or pull the list from the endpoint.
                 Kept free-solo so a model the provider doesn't advertise (a
@@ -504,7 +438,7 @@ export const ModelSelectionButton: React.FC<ModelSelectionButtonProps> = ({ appe
                     renderInput={(params) => (
                         <TextField
                             {...params}
-                            label={newEndpoint === 'azure' ? t('model.deploymentName') : t('model.model')}
+                            label={t('model.model')}
                             placeholder={t('model.modelPlaceholder')}
                             autoComplete="off"
                         />
@@ -517,7 +451,7 @@ export const ModelSelectionButton: React.FC<ModelSelectionButtonProps> = ({ appe
                         <Button
                             size="small"
                             variant="outlined"
-                            disabled={!isEditingDetails || !newEndpoint || loadingProviderModels}
+                            disabled={!isEditingDetails || !newApiBase || loadingProviderModels}
                             onClick={handleLoadProviderModels}
                             startIcon={loadingProviderModels
                                 ? <CircularProgress size={iconVar.sm} />
@@ -535,82 +469,7 @@ export const ModelSelectionButton: React.FC<ModelSelectionButtonProps> = ({ appe
                 </Typography>
             )}
 
-            {newEndpoint === 'azure' && (
-                <ToggleButtonGroup
-                    exclusive
-                    fullWidth
-                    size="small"
-                    disabled={!isEditingDetails}
-                    value={azureAuthMethod}
-                    onChange={(_event, value) => {
-                        if (!value) return;
-                        setAzureAuthMethod(value);
-                        if (value === 'azure_cli') setNewApiKey('');
-                    }}
-                    aria-label={t('model.authentication')}
-                >
-                    <ToggleButton value="azure_cli">Azure CLI</ToggleButton>
-                    <ToggleButton value="api_key">{t('model.apiKey')}</ToggleButton>
-                </ToggleButtonGroup>
-            )}
-
-            {newEndpoint === 'azure' && azureAuthMethod === 'azure_cli' && (
-                <Box sx={{ px: 1.5, py: 1.25, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
-                        {t('model.authentication')}
-                    </Typography>
-                    {azureCliStatus?.signed_in ? (
-                        <Typography variant="body2" color="success.main">
-                            {t('model.azureCliAccess', {
-                                user: azureCliStatus.account?.user || t('db.cliLoginCurrentAccount'),
-                            })}
-                        </Typography>
-                    ) : (
-                        <Button
-                            variant="outlined"
-                            size="small"
-                            disabled={!isEditingDetails || azureCliLoginPending || azureCliStatus?.installed === false}
-                            onClick={handleAzureCliLogin}
-                            startIcon={azureCliLoginPending ? <CircularProgress size={iconVar.sm} /> : undefined}
-                        >
-                            {azureCliStatus?.installed === false
-                                ? t('db.cliNotInstalled')
-                                : t('db.cliLogin')}
-                        </Button>
-                    )}
-                </Box>
-            )}
-
-            {newEndpoint && (newEndpoint !== 'azure' || azureAuthMethod === 'api_key')
-                && (isEditingDetails || detailHasConfiguredApiKey) && (
-                <TextField
-                    fullWidth
-                    size="small"
-                    disabled={!isEditingDetails}
-                    type={isEditingDetails && !showKeys ? 'password' : 'text'}
-                    label={t('model.apiKey')}
-                    value={isEditingDetails ? newApiKey : CONFIGURED_SECRET_MASK}
-                    onChange={(event) => setNewApiKey(event.target.value)}
-                    autoComplete="off"
-                />
-            )}
-
-            {newEndpoint && (isEditingDetails || Boolean(newApiBase)) && (
-                <TextField
-                    fullWidth
-                    size="small"
-                    disabled={!isEditingDetails}
-                    label={newEndpoint === 'azure' ? t('model.endpoint') : t('model.apiBase')}
-                    value={newApiBase}
-                    onChange={(event) => setNewApiBase(event.target.value)}
-                    placeholder={newEndpoint === 'ollama' ? 'http://localhost:11434'
-                        : newEndpoint === 'custom' ? 'https://<resource>.openai.azure.com/openai/v1'
-                        : undefined}
-                    autoComplete="off"
-                />
-            )}
-
-            {newEndpoint === 'azure' && (isEditingDetails || Boolean(newApiVersion)) && (
+            {(isEditingDetails || Boolean(newApiVersion)) && (
                 <Accordion disableGutters elevation={0} sx={{ border: '1px solid', borderColor: 'divider', '&:before': { display: 'none' } }}>
                     <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                         <Typography variant="body2">{t('model.advancedSettings')}</Typography>
@@ -670,6 +529,39 @@ export const ModelSelectionButton: React.FC<ModelSelectionButtonProps> = ({ appe
         </Box>
     );
 
+    // What a non-admin sees in place of the configuration form: the facts that
+    // identify the model, and nothing that could change it. The API key is not
+    // among them — it is never sent to the browser for a server model anyway.
+    const readOnlyModelDetails = (
+        <Box sx={{ display: 'grid', gap: 1.5 }}>
+            {detailModel ? (
+                <>
+                    <Box>
+                        <Typography variant="caption" color="text.secondary">{t('model.model')}</Typography>
+                        <Typography variant="body2">{detailModel.model}</Typography>
+                    </Box>
+                    {detailModel.api_base && (
+                        <Box>
+                            <Typography variant="caption" color="text.secondary">{t('model.apiBase')}</Typography>
+                            <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>{detailModel.api_base}</Typography>
+                        </Box>
+                    )}
+                    <Typography variant="caption" color="text.secondary">
+                        {t('model.adminManagedDetail', {
+                            defaultValue: 'Configured by your administrator. Contact them to add or change a model.',
+                        })}
+                    </Typography>
+                </>
+            ) : (
+                <Typography variant="body2" color="text.secondary">
+                    {t('model.noModelsConfigured', {
+                        defaultValue: 'No models are configured on this server yet. Your administrator sets them up.',
+                    })}
+                </Typography>
+            )}
+        </Box>
+    );
+
     const modelManagerView = (
         <Box sx={{
             display: 'grid',
@@ -700,7 +592,7 @@ export const ModelSelectionButton: React.FC<ModelSelectionButtonProps> = ({ appe
                                 <Box sx={{ minWidth: 0 }}>
                                     <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>{model.model}</Typography>
                                     <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
-                                        {model.endpoint}
+                                        {model.api_base || t('model.apiBase')}
                                     </Typography>
                                 </Box>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -709,7 +601,7 @@ export const ModelSelectionButton: React.FC<ModelSelectionButtonProps> = ({ appe
                                             {t('model.current')}
                                         </Typography>
                                     )}
-                                    {!globalModels.some(globalModel => globalModel.id === model.id) && (
+                                    {canConfigure && !globalModels.some(globalModel => globalModel.id === model.id) && (
                                         <Tooltip title={t('model.removeModel')}>
                                             <IconButton
                                                 size="small"
@@ -731,18 +623,26 @@ export const ModelSelectionButton: React.FC<ModelSelectionButtonProps> = ({ appe
                                 </Box>
                             </Box>
                     ))}
-                    <Button
-                        size="small"
-                        startIcon={<AddCircleIcon />}
-                        onClick={startNewModel}
-                        variant={detailModelId === undefined && isEditingDetails ? 'soft' : 'text'}
-                        sx={{
-                            justifyContent: 'flex-start',
-                            mt: 1,
-                        }}
-                    >
-                        {t('model.addModel')}
-                    </Button>
+                    {canConfigure ? (
+                        <Button
+                            size="small"
+                            startIcon={<AddCircleIcon />}
+                            onClick={startNewModel}
+                            variant={detailModelId === undefined && isEditingDetails ? 'soft' : 'text'}
+                            sx={{
+                                justifyContent: 'flex-start',
+                                mt: 1,
+                            }}
+                        >
+                            {t('model.addModel')}
+                        </Button>
+                    ) : (
+                        <Typography variant="caption" color="text.secondary" sx={{ mt: 1.5, px: 1 }}>
+                            {t('model.adminManaged', {
+                                defaultValue: 'Your administrator configures the models available here.',
+                            })}
+                        </Typography>
+                    )}
                 </Box>
             </Box>
             <Box sx={{ minWidth: 0 }}>
@@ -755,7 +655,7 @@ export const ModelSelectionButton: React.FC<ModelSelectionButtonProps> = ({ appe
                             <Typography variant="caption" color="text.secondary">{t('model.serverManaged')}</Typography>
                         )}
                     </Box>
-                    {!isEditingDetails && detailModel && (
+                    {!isEditingDetails && detailModel && canConfigure && (
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                             <Button
                                 size="small"
@@ -796,7 +696,7 @@ export const ModelSelectionButton: React.FC<ModelSelectionButtonProps> = ({ appe
                         </Box>
                     )}
                 </Box>
-                {addModelForm}
+                {canConfigure ? addModelForm : readOnlyModelDetails}
             </Box>
         </Box>
     );
@@ -814,7 +714,7 @@ export const ModelSelectionButton: React.FC<ModelSelectionButtonProps> = ({ appe
     let modelNotReady = !isModelReady(tempSelectedModelId);
 
     let tempModel = allModels.find(m => m.id == tempSelectedModelId);
-    let tempModelName = tempModel ? `${tempModel.endpoint}/${tempModel.model}` : t('model.pleaseSelectModel');
+    let tempModelName = tempModel ? tempModel.model : t('model.pleaseSelectModel');
     let selectedModelName = allModels.find(m => m.id == selectedModelId)?.model || t('model.unselected');
 
     const selectedReady = isModelReady(selectedModelId);
@@ -859,10 +759,9 @@ export const ModelSelectionButton: React.FC<ModelSelectionButtonProps> = ({ appe
             <DialogTitle>{t('model.models')}</DialogTitle>
             <DialogContent sx={{ minWidth: { sm: 720 } }}>{modelManagerView}</DialogContent>
             <DialogActions>
-                {isEditingDetails ? (
+                {isEditingDetails && canConfigure ? (
                     <>
-                        {!serverConfig.DISABLE_DISPLAY_KEYS && newEndpoint
-                            && (newEndpoint !== 'azure' || azureAuthMethod === 'api_key') && (
+                        {!serverConfig.DISABLE_DISPLAY_KEYS && (
                             <FormControlLabel
                                 control={<Switch size="small" checked={showKeys} onChange={() => setShowKeys(!showKeys)} />}
                                 label={<Typography variant="body2">{t('model.showKeys')}</Typography>}

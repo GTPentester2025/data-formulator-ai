@@ -10,10 +10,7 @@ from unittest.mock import patch
 
 import pytest
 
-from data_formulator.model_registry import (
-    ModelRegistry,
-    BUILTIN_PROVIDERS,
-)
+from data_formulator.model_registry import ENDPOINT, ModelRegistry
 
 pytestmark = [pytest.mark.backend]
 
@@ -36,16 +33,17 @@ SAMPLE_ENV = _make_env({
     "openai": {
         "enabled": "true",
         "api_key": "sk-secret-openai-key",
+        "api_base": "https://api.openai.com/v1",
         "models": "gpt-4o,gpt-5",
     },
+    # A keyless endpoint: an API base is enough to register it.
     "ollama": {
         "enabled": "true",
-        "api_base": "http://localhost:11434",
+        "api_base": "http://localhost:11434/v1",
         "models": "qwen3:32b",
     },
     "deepseek": {
         "enabled": "true",
-        "endpoint": "openai",
         "api_key": "sk-secret-deepseek-key",
         "api_base": "https://api.deepseek.com/v1",
         "models": "deepseek-chat",
@@ -79,13 +77,23 @@ class TestModelDiscovery:
         registry = ModelRegistry()
         assert registry.list_public() == []
 
-    @patch.dict(os.environ, {"OPENAI_ENABLED": "true", "OPENAI_API_KEY": "sk-x"}, clear=True)
+    @patch.dict(os.environ, {"OPENAI_ENABLED": "true", "OPENAI_API_KEY": "sk-x",
+                             "OPENAI_API_BASE": "https://api.openai.com/v1"}, clear=True)
     def test_skips_provider_without_models(self):
         """OPENAI_MODELS not set → no models registered."""
         registry = ModelRegistry()
         assert registry.list_public() == []
 
-    @patch.dict(os.environ, {"OPENAI_ENABLED": "false", "OPENAI_API_KEY": "sk-x", "OPENAI_MODELS": "gpt-4o"}, clear=True)
+    @patch.dict(os.environ, {"OPENAI_ENABLED": "true", "OPENAI_API_KEY": "sk-x",
+                             "OPENAI_MODELS": "gpt-4o"}, clear=True)
+    def test_skips_provider_without_api_base(self):
+        """Every model is a custom endpoint, so there is no default to fall back on."""
+        registry = ModelRegistry()
+        assert registry.list_public() == []
+
+    @patch.dict(os.environ, {"OPENAI_ENABLED": "false", "OPENAI_API_KEY": "sk-x",
+                             "OPENAI_API_BASE": "https://api.openai.com/v1",
+                             "OPENAI_MODELS": "gpt-4o"}, clear=True)
     def test_skips_disabled_provider(self):
         registry = ModelRegistry()
         assert registry.list_public() == []
@@ -122,35 +130,38 @@ class TestPublicListingSecurity:
 
 
 # ---------------------------------------------------------------------------
-# Tests: custom provider endpoint resolution
+# Tests: every provider is one custom OpenAI-compatible endpoint
 # ---------------------------------------------------------------------------
 
 class TestCustomProvider:
     @patch.dict(os.environ, SAMPLE_ENV, clear=True)
-    def test_custom_provider_uses_explicit_endpoint(self):
-        """deepseek is not in BUILTIN_PROVIDERS, so it reads DEEPSEEK_ENDPOINT."""
+    def test_every_model_uses_the_custom_endpoint(self):
+        """The provider name is a label; the API base decides where calls go."""
         registry = ModelRegistry()
-        config = registry.get_config("global-deepseek-deepseek-chat")
-        assert config is not None
-        assert config["endpoint"] == "openai"
-
-    @patch.dict(os.environ, SAMPLE_ENV, clear=True)
-    def test_builtin_provider_uses_own_name_as_endpoint(self):
-        registry = ModelRegistry()
-        config = registry.get_config("global-openai-gpt-4o")
-        assert config is not None
-        assert config["endpoint"] == "openai"
+        for model in registry.list_public():
+            assert model["endpoint"] == ENDPOINT
 
     @patch.dict(os.environ, {
         "MYVENDOR_ENABLED": "true",
+        "MYVENDOR_ENDPOINT": "anthropic",
         "MYVENDOR_API_KEY": "key123",
+        "MYVENDOR_API_BASE": "https://gateway.internal/v1",
         "MYVENDOR_MODELS": "my-model",
     }, clear=True)
-    def test_custom_provider_defaults_to_openai_endpoint(self):
-        """When MYVENDOR_ENDPOINT is not set, defaults to 'openai'."""
+    def test_endpoint_variable_cannot_select_another_provider(self):
+        """A leftover _ENDPOINT from an older config must not resurrect a
+        hosted provider — there is only one transport now."""
         registry = ModelRegistry()
         config = registry.get_config("global-myvendor-my-model")
         assert config is not None
-        assert config["endpoint"] == "openai"
+        assert config["endpoint"] == ENDPOINT
+
+    @patch.dict(os.environ, SAMPLE_ENV, clear=True)
+    def test_keyless_endpoint_registers(self):
+        registry = ModelRegistry()
+        config = registry.get_config("global-ollama-qwen3:32b")
+        assert config is not None
+        assert config["api_key"] == ""
+        assert config["api_base"] == "http://localhost:11434/v1"
 
 

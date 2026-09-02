@@ -1,7 +1,6 @@
 {
     "model": {
         "selectModel": "选择模型",
-        "provider": "提供商",
         "apiKey": "API 密钥",
         "model": "模型",
         "apiBase": "API 基础地址",
@@ -22,20 +21,12 @@
         "testAndSave": "测试并保存",
         "back": "返回",
         "testAndAdd": "测试并添加",
-        "deploymentName": "部署名称",
-        "authentication": "身份验证",
-        "apiKeyAlternative": "API 密钥（备选）",
-        "endpoint": "端点",
-        "azureAccount": "Azure 账户：{{user}}",
-        "azureCliAccess": "你可以访问账户 {{user}} 获准使用的 Azure 模型。",
         "existingModels": "现有模型",
         "copyExistingHint": "以现有模型为起点填写新配置。",
         "useAsTemplate": "用作模板",
         "testConnection": "测试连接",
         "connectionSuccess": "连接成功",
         "connectionFailed": "连接失败",
-        "litellmNote": "基于 LiteLLM 的模型配置。查看支持的提供商。",
-        "seeDocs": "查看支持的提供商",
         "default": "默认",
         "ready": "可用",
         "retest": "重试",
@@ -45,7 +36,6 @@
         "current": "当前使用",
         "unselected": "未选择",
         "pleaseSelectModel": "请选择模型",
-        "providerPlaceholder": "提供商",
         "example": "示例",
         "optionalKeylessEndpoint": "无密钥端点可选填",
         "modelPlaceholder": "例如：gpt-5.4",
@@ -63,7 +53,6 @@
         "useModel": "使用 {{modelName}}",
         "cancel": "取消",
         "recommendedModelTip": "具备较强编程和多模态能力的模型体验更好。",
-        "openaiProviderTip": "对于兼容 OpenAI 的 API，请将 提供商 设置为 openai 。",
         "loadingModels": "模型加载中...",
         "serverManaged": "由服务端管理",
         "serverChip": "服务端配置",
@@ -83,6 +72,11 @@
         "configuredMessage": "服务端已配置，点击可验证连通性",
         "loadModels": "加载模型",
         "loadModelsHint": "获取该端点提供的模型列表",
-        "loadModelsFound": "可用模型 {{count}} 个 —— 请从列表中选择。"
+        "loadModelsFound": "可用模型 {{count}} 个 —— 请从列表中选择。",
+        "adminManaged": "可用模型由管理员配置。",
+        "adminManagedDetail": "由管理员配置。如需添加或修改模型，请联系管理员。",
+        "noModelsConfigured": "本服务器尚未配置任何模型，请联系管理员设置。",
+        "apiBaseHint": "OpenAI 兼容的基础地址，系统会自动追加 /chat/completions。",
+        "apiKeyHint": "仅当端点无需密钥时才留空 —— 需要密钥的端点会返回 401。"
     }
 }

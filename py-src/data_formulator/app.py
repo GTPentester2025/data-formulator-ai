@@ -428,6 +428,12 @@ def get_app_config():
     from data_formulator.auth.identity import is_local_mode
     config["IS_LOCAL_MODE"] = is_local_mode()
 
+    # Drives whether the model dialog offers configuration at all. The server
+    # enforces the same rule on every model route, so this only decides what
+    # the UI bothers to render.
+    from data_formulator.auth.roles import is_admin
+    config["IS_ADMIN"] = is_admin()
+
     if workspace_backend == 'local':
         from data_formulator.datalake.workspace import get_data_formulator_home
         config["DATA_FORMULATOR_HOME"] = str(get_data_formulator_home())

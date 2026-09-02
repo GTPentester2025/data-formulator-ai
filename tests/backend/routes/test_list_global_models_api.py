@@ -20,10 +20,12 @@ pytestmark = [pytest.mark.backend]
 SAMPLE_ENV = {
     "OPENAI_ENABLED": "true",
     "OPENAI_API_KEY": "sk-secret-key-12345",
+    "OPENAI_API_BASE": "https://api.openai.com/v1",
     "OPENAI_MODELS": "gpt-4o,gpt-4o-mini",
-    "ANTHROPIC_ENABLED": "true",
-    "ANTHROPIC_API_KEY": "sk-ant-secret",
-    "ANTHROPIC_MODELS": "claude-sonnet-4-20250514",
+    "GATEWAY_ENABLED": "true",
+    "GATEWAY_API_KEY": "sk-gateway-secret",
+    "GATEWAY_API_BASE": "https://gateway.internal/v1",
+    "GATEWAY_MODELS": "claude-sonnet-4-20250514",
 }
 
 

@@ -1,26 +1,31 @@
 import os
 from typing import Optional, Dict, List
 
-BUILTIN_PROVIDERS = {'openai', 'azure', 'anthropic', 'gemini', 'ollama'}
+#: The single provider type every configured model uses. Kept in step with
+#: :attr:`data_formulator.agents.client_utils.Client.ENDPOINT`.
+ENDPOINT = "custom"
 
 
 class ModelRegistry:
     """
-    Load global model configurations from environment variables.
+    Load the server's model configurations from environment variables.
 
-    Supports both built-in providers (openai / azure / anthropic / gemini /
-    ollama) and arbitrary custom providers (e.g. DEEPSEEK, QWEN).
+    Every model is a **custom OpenAI-compatible endpoint** — an internal
+    gateway, a LiteLLM proxy, vLLM, Ollama's OpenAI shim, Azure AI Foundry's
+    ``/openai/v1`` surface. There are no hosted-provider shortcuts: the name
+    you choose is only a label, and the base URL decides where calls go.
 
-    For a custom provider, set:
+    For each provider, set:
         {PROVIDER}_ENABLED=true
-        {PROVIDER}_ENDPOINT=openai        # actual call type; defaults to openai
-        {PROVIDER}_API_KEY=<key>
-        {PROVIDER}_API_BASE=<url>
+        {PROVIDER}_API_BASE=<url>         # required, e.g. https://gateway/v1
+        {PROVIDER}_API_KEY=<key>          # optional; omit for a keyless endpoint
         {PROVIDER}_API_VERSION=<ver>      # optional
         {PROVIDER}_MODELS=model-a,model-b
 
-    API keys and credentials live server-side only; the public information
-    returned to the frontend contains no sensitive fields.
+    These variables are the only way to publish a model: the UI cannot add one,
+    so the endpoints and keys a deployment will ever call are fixed by whoever
+    controls the server's environment. API keys stay server-side; the public
+    information returned to the frontend contains no sensitive fields.
     """
 
     def __init__(self) -> None:
@@ -53,13 +58,10 @@ class ModelRegistry:
             api_version = os.getenv(f"{env}_API_VERSION", "").strip()
             models_str = os.getenv(f"{env}_MODELS", "").strip()
 
-            if not (api_key or api_base) or not models_str:
+            # No base URL means there is nowhere to send the request: every
+            # model here is a custom endpoint, and none of them have a default.
+            if not api_base or not models_str:
                 continue
-
-            if provider in BUILTIN_PROVIDERS:
-                endpoint = provider
-            else:
-                endpoint = os.getenv(f"{env}_ENDPOINT", "openai").strip().lower()
 
             for model_name in models_str.split(","):
                 model_name = model_name.strip()
@@ -69,7 +71,7 @@ class ModelRegistry:
                 model_id = self.make_id(provider, model_name)
                 self._models[model_id] = {
                     "id": model_id,
-                    "endpoint": endpoint,
+                    "endpoint": ENDPOINT,
                     "model": model_name,
                     "api_key": api_key,
                     "api_base": api_base,
@@ -93,11 +95,7 @@ class ModelRegistry:
                 "model": m["model"],
                 "api_base": m["api_base"],
                 "api_version": m["api_version"],
-                "auth_mode": (
-                    "azure_identity"
-                    if m["endpoint"] == "azure" and not m["api_key"]
-                    else "key"
-                ),
+                "auth_mode": "key",
                 "is_global": True,
             }
             for m in self._models.values()

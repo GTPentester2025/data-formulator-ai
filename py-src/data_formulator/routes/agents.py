@@ -185,16 +185,22 @@ def get_client(model_config, trusted=False):
     ``model_registry`` pass ``trusted=True``; everything reached from an HTTP
     payload must leave it ``False``.
     """
-    # ``is_global`` arrives inside the request body, so it is only a *claim*
-    # that some id names a server-configured model.  Trust has to come from
-    # that lookup actually succeeding -- never from the flag itself.  Treating
-    # the flag as proof let a caller attach it to a config it fully controlled
-    # and inherit the exemptions granted to global models below, turning
-    # ``api_base`` into an SSRF sink that the server signs with its own
-    # credentials.
-    if not trusted and model_config.get("is_global"):
+    # Trust comes from the registry lookup succeeding, never from anything in
+    # the request. Treating the body's ``is_global`` flag as proof let a caller
+    # attach it to a config it fully controlled and inherit the exemptions
+    # granted to server models below, turning ``api_base`` into an SSRF sink
+    # that the server signs with its own credentials.
+    #
+    # The id is looked up whether or not the flag is set, so the server's own
+    # configuration always wins over whatever the body says about a model it
+    # publishes -- a request cannot keep a known id and swap the endpoint
+    # underneath it.
+    if not trusted:
         resolved = model_registry.get_config(model_config.get("id"))
-        if resolved is None:
+        if resolved is not None:
+            model_config = resolved
+            trusted = True
+        elif model_config.get("is_global"):
             # Fail closed.  Continuing with the caller's own config would hand
             # it exactly the trust it just failed to prove.
             logger.warning(
@@ -204,10 +210,16 @@ def get_client(model_config, trusted=False):
             raise AppError(
                 ErrorCode.ACCESS_DENIED,
                 "Unknown global model. Pick a model from the server's "
-                "configured list, or supply your own API credentials.",
+                "configured list.",
             )
-        model_config = resolved
-        trusted = True
+
+    if not trusted:
+        # The config names an endpoint the server was never configured with, so
+        # it is the caller asking us to call somewhere new with credentials of
+        # their choosing. That is a model-configuration decision, and this
+        # deployment reserves those for administrators.
+        from data_formulator.auth.roles import require_admin
+        require_admin("use a model that is not configured on this server")
 
     # Copy before normalising: a registry config is shared server-wide and must
     # not be mutated in place by the strip below.
@@ -229,13 +241,18 @@ def get_client(model_config, trusted=False):
             # of a generic 500.
             raise AppError(ErrorCode.ACCESS_DENIED, str(e)) from e
 
-    client = Client(
-        model_config["endpoint"],
-        model_config["model"],
-        model_config.get("api_key") or None,
-        model_config.get("api_base") or None,
-        model_config.get("api_version") or None,
-    )
+    try:
+        client = Client(
+            model_config["endpoint"],
+            model_config["model"],
+            model_config.get("api_key") or None,
+            model_config.get("api_base") or None,
+            model_config.get("api_version") or None,
+        )
+    except ValueError as e:
+        # Client rejects anything that is not a custom OpenAI-compatible
+        # endpoint, and a stale saved model can still name a removed provider.
+        raise AppError(ErrorCode.INVALID_REQUEST, str(e)) from e
 
     return client
 
@@ -349,41 +366,24 @@ def _parse_model_list(payload) -> list[str]:
 
 def _model_list_requests(endpoint: str, api_key: str, api_base: str,
                          api_version: str) -> list[tuple[str, dict]]:
-    """Candidate (url, headers) pairs to try, best first, for *endpoint*."""
+    """The ``GET <base>/models`` call that asks an endpoint what it serves.
+
+    One shape, because one provider: every model is a custom OpenAI-compatible
+    endpoint. Both auth headers go out together — Azure-style gateways read
+    ``api-key`` and everything else reads ``Authorization`` — and a blank key
+    sends neither, so a keyless endpoint is not refused for an empty bearer.
+    """
     from data_formulator.agents.client_utils import normalize_openai_compatible_base
 
-    if endpoint in ("openai", "custom"):
-        base = normalize_openai_compatible_base(api_base) if api_base else "https://api.openai.com/v1"
-        # Azure-style gateways read `api-key`; everything else reads Bearer.
+    if not api_base:
+        raise AppError(ErrorCode.INVALID_REQUEST,
+                       "Enter the endpoint's API base URL before listing models")
+
+    headers = {}
+    if api_key:
         headers = {"Authorization": f"Bearer {api_key}", "api-key": api_key}
-        return [(f"{base}/models", headers)]
-
-    if endpoint == "ollama":
-        base = (api_base or "http://localhost:11434").rstrip("/")
-        if base.endswith("/api"):
-            base = base[: -len("/api")]
-        if base.endswith("/v1"):
-            base = base[: -len("/v1")]
-        return [(f"{base}/api/tags", {}), (f"{base}/v1/models", {})]
-
-    if endpoint == "anthropic":
-        return [("https://api.anthropic.com/v1/models",
-                 {"x-api-key": api_key, "anthropic-version": "2023-06-01"})]
-
-    if endpoint == "gemini":
-        return [(f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}", {})]
-
-    if endpoint == "azure":
-        if not api_base:
-            raise AppError(ErrorCode.INVALID_REQUEST,
-                           "Azure requires an endpoint URL before models can be listed")
-        base = api_base.rstrip("/")
-        version = api_version or "2024-10-21"
-        return [(f"{base}/openai/models?api-version={version}", {"api-key": api_key}),
-                (f"{base}/models?api-version={version}", {"api-key": api_key})]
-
-    raise AppError(ErrorCode.INVALID_REQUEST,
-                   f"Listing models is not supported for provider '{endpoint}'")
+    base = normalize_openai_compatible_base(api_base)
+    return [(f"{base}/models", headers)]
 
 
 @agent_bp.route('/list-provider-models', methods=['POST'])
@@ -397,15 +397,19 @@ def list_provider_models():
     if not request.is_json:
         raise AppError(ErrorCode.INVALID_REQUEST, "Invalid request format")
 
+    # Probing an arbitrary endpoint with arbitrary credentials is part of
+    # configuring a model, so it is an administrator's call.
+    from data_formulator.auth.roles import require_admin
+    require_admin("list the models on an endpoint")
+
     content = request.get_json() or {}
     cfg = content.get('model') or {}
-    endpoint = str(cfg.get('endpoint') or '').strip().lower()
+    # There is one provider, so an absent endpoint means the default rather
+    # than an unanswerable question.
+    endpoint = str(cfg.get('endpoint') or Client.ENDPOINT).strip().lower()
     api_key = str(cfg.get('api_key') or '').strip()
     api_base = str(cfg.get('api_base') or '').strip()
     api_version = str(cfg.get('api_version') or '').strip()
-
-    if not endpoint:
-        raise AppError(ErrorCode.INVALID_REQUEST, "Select a provider first")
 
     # The base URL is caller-supplied, so it goes through the same SSRF
     # allowlist that guards model calls.
@@ -445,6 +449,14 @@ def test_model():
 
     logger.info("# test-model request")
     content = request.get_json()
+
+    # Testing a model the server does not already know means dialling an
+    # endpoint of the caller's choosing; get_client() applies the same rule,
+    # but checking here keeps the refusal on the configuration route where the
+    # message makes sense.
+    if not model_registry.is_global((content.get('model') or {}).get('id')):
+        from data_formulator.auth.roles import require_admin
+        require_admin("test a model configuration")
 
     logger.debug("content------------------------------")
     logger.debug(content)

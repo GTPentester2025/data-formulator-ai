@@ -17,6 +17,7 @@ import pandas as pd
 
 from data_formulator.agent_config import reasoning_effort_for
 from data_formulator.agents.agent_utils import accumulate_reasoning_content
+from data_formulator.agents.client_utils import salvage_tool_call_from_text
 from data_formulator.datalake.parquet_utils import df_to_safe_records
 
 logger = logging.getLogger(__name__)
@@ -961,6 +962,20 @@ class DataLoadingAgent:
                             tool_calls_acc[idx]["name"] = tc_delta.function.name
                         if hasattr(tc_delta.function, 'arguments') and tc_delta.function.arguments:
                             tool_calls_acc[idx]["arguments"] += tc_delta.function.arguments
+
+            # An endpoint without native function calling streams the action as
+            # a JSON object on the content channel, which would otherwise reach
+            # the user as raw JSON and leave the tool unrun. Recover it before
+            # concluding the model made no call.
+            if not tool_calls_acc:
+                salvaged = salvage_tool_call_from_text("".join(current_text), TOOLS)
+                if salvaged is not None:
+                    name, args = salvaged
+                    logger.info("Recovered a '%s' call the endpoint emitted as "
+                                "content rather than a tool call", name)
+                    tool_calls_acc[0] = {"id": "call_salvage_0", "name": name,
+                                         "arguments": json.dumps(args)}
+                    current_text.clear()
 
             # No tool calls -> the model produced its final turn (either text, or
             # an intentional silence after showing an interactive preview). Done.

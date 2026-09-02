@@ -39,10 +39,16 @@ results — starting from any data format (screenshot, text, CSV, or database).
 
 This build adds:
 
-- **Any OpenAI-compatible model endpoint.** Pick the `custom` provider and
-  point it at Azure AI Foundry, Groq, OpenRouter, LM Studio, vLLM, a LiteLLM
-  proxy, or a local Ollama server. Pasted URLs are normalized, so a base URL
-  copied straight from a provider's docs works.
+- **One model provider: your own OpenAI-compatible endpoint.** Point it at an
+  internal gateway, Azure AI Foundry, Groq, OpenRouter, LM Studio, vLLM, a
+  LiteLLM proxy, or a local Ollama server. There are no hosted-provider
+  shortcuts to configure or audit — the base URL is what decides where a call
+  goes. Pasted URLs are normalized, so a base URL copied straight from a
+  provider's docs works, and an internal CA can be trusted with
+  `DF_LLM_CA_BUNDLE`.
+- **Models are an administrator's setting.** They come from the server's
+  environment file; everyone else sees the loaded list, read-only, and cannot
+  point the server at an endpoint of their own.
 - **Export that leaves the app.** Copy a chart image to the clipboard,
   download it as a PNG, or download Excel workbooks — table only, or table
   plus a **native, editable Excel chart** whose series are linked to the
@@ -90,17 +96,33 @@ This build adds:
 
 ## Connecting a model
 
-Open the model dialog, choose a provider, and fill in the model name, API key,
-and (for `custom`) the API base URL. Examples:
+Every model is one OpenAI-compatible endpoint: a base URL, a model id, and an
+optional API key. Set them in the server's `.env` (see `.env.template`), where
+they are available to everyone who uses the server:
 
-| Provider | Model | API base |
-|---|---|---|
-| `custom` | your deployment name | `https://<resource>.openai.azure.com/openai/v1` |
-| `custom` | `llama-3.3-70b-versatile` | `https://api.groq.com/openai/v1` |
-| `custom` | `llama3` | `http://localhost:11434/v1` |
-| `openai` | `gpt-4.1` | *(blank — uses the default endpoint)* |
+```env
+MYGATEWAY_ENABLED=true
+MYGATEWAY_API_BASE=https://your-gateway.example.com/v1
+MYGATEWAY_API_KEY=sk-...
+MYGATEWAY_MODELS=gpt-4.1,gpt-4.1-mini
+```
 
-Press **Test** to confirm connectivity before using the model.
+The prefix is just a label — it groups the models in the picker. Base URLs are
+normalized, so all of these work:
+
+| Model | API base |
+|---|---|
+| your deployment name | `https://<resource>.openai.azure.com/openai/v1` |
+| `llama-3.3-70b-versatile` | `https://api.groq.com/openai/v1` |
+| `llama3` | `http://localhost:11434/v1` (keyless — omit the key) |
+
+An administrator can also add a model from the model dialog and press **Test**
+to confirm connectivity. Everyone else picks from the loaded list; the
+configuration controls are neither shown to them nor accepted from them, since
+a model configuration names an outbound destination and spends the server's
+credentials. Who counts as an administrator: the `admin` role under
+`AUTH_PROVIDER=local`, the person at the keyboard in single-user localhost
+mode, or anyone named in `DF_ADMIN_USERS`.
 
 ## Using Data Formulator
 

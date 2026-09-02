@@ -78,6 +78,11 @@ def list_model_endpoints():
 
 @model_endpoints_bp.route("", methods=["POST"])
 def remember_model_endpoint():
+    # This history only exists to refill the "add a model" form, which is an
+    # administrator's screen — so nobody else has anything to remember.
+    from data_formulator.auth.roles import require_admin
+    require_admin("save a model endpoint")
+
     if not request.is_json:
         raise AppError(ErrorCode.INVALID_REQUEST, "Invalid request format")
     entry = _sanitize_entry(request.get_json())

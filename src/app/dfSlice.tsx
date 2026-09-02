@@ -68,6 +68,9 @@ export interface ServerConfig {
     DISABLE_DISPLAY_KEYS: boolean;
     DISABLE_DATA_CONNECTORS: boolean;
     DISABLE_CUSTOM_MODELS: boolean;
+    // Whether this user may configure models at all. The server decides and
+    // enforces it; the UI only uses it to decide what to render.
+    IS_ADMIN?: boolean;
     MAX_DISPLAY_ROWS: number;
     AVAILABLE_LANGUAGES: string[];
     DATA_FORMULATOR_HOME?: string;
@@ -107,7 +110,7 @@ export interface ModelConfig {
     api_base?: string;
     api_version?: string;
     /** Non-sensitive server hint describing how a global model authenticates. */
-    auth_mode?: 'key' | 'azure_identity';
+    auth_mode?: 'key';
     /** True for models configured server-side via .env. Their credentials never leave the server. */
     is_global?: boolean;
 }
@@ -343,6 +346,7 @@ const initialState: DataFormulatorState = {
         DISABLE_DISPLAY_KEYS: false,
         DISABLE_DATA_CONNECTORS: false,
         DISABLE_CUSTOM_MODELS: false,
+        IS_ADMIN: false,
         MAX_DISPLAY_ROWS: 10000,
         AVAILABLE_LANGUAGES: ['en', 'zh'],
         DEV_MODE: false,

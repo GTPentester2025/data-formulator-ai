@@ -48,7 +48,7 @@ from data_formulator.agents.context import (
     build_peripheral_thread_context,
     handle_inspect_source_data,
 )
-from data_formulator.agents.client_utils import Client
+from data_formulator.agents.client_utils import Client, salvage_tool_call_from_text
 from data_formulator.datalake.parquet_utils import df_to_safe_records
 
 from data_formulator.analyst.skills import (
@@ -1994,8 +1994,23 @@ class AnalystAgent:
                 type="function",
                 function=SimpleNamespace(name=tc["name"], arguments=tc["arguments"]),
             ))
+        content = "".join(content_parts)
+        if not tool_call_objs:
+            # An endpoint without native function calling streams the action as
+            # a JSON object on the content channel. Recovering it here is what
+            # keeps the turn an action instead of a wall of JSON.
+            salvaged = salvage_tool_call_from_text(content, tools)
+            if salvaged is not None:
+                name, args = salvaged
+                logger.info("Recovered a '%s' call the endpoint emitted as "
+                            "content rather than a tool call", name)
+                tool_call_objs.append(SimpleNamespace(
+                    id="call_salvage_0", type="function",
+                    function=SimpleNamespace(name=name, arguments=json.dumps(args)),
+                ))
+                content = ""
         message = SimpleNamespace(
-            content="".join(content_parts) or None,
+            content=content or None,
             tool_calls=tool_call_objs or None,
             reasoning_content=reasoning_acc,
         )

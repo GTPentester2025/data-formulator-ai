@@ -148,7 +148,7 @@ Docker is the easiest way to run Data Formulator without installing Python or No
 
     ```bash
     cp .env.template .env
-    # Edit .env and set your OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.
+    # Edit .env and point {NAME}_API_BASE / {NAME}_API_KEY / {NAME}_MODELS at your endpoint
     ```
 
 2. **Build and start the container:**
@@ -395,10 +395,12 @@ EPHEMERAL_WORKSPACE_CLEANUP_INTERVAL_SECONDS=1800
 DISABLE_DATA_CONNECTORS=true
 DISABLE_CUSTOM_MODELS=true
 DISABLE_DISPLAY_KEYS=true
-# Pre-configure the LLM models users can access:
-OPENAI_ENABLED=true
-OPENAI_API_KEY=sk-...
-OPENAI_MODELS=gpt-4.1
+# Pre-configure the LLM models users can access. Every provider is a custom
+# OpenAI-compatible endpoint; the name is just a label for the model ids.
+MYGATEWAY_ENABLED=true
+MYGATEWAY_API_BASE=https://your-gateway.example.com/v1
+MYGATEWAY_API_KEY=sk-...
+MYGATEWAY_MODELS=gpt-4.1
 ```
 
 | Setting | Value | Why |

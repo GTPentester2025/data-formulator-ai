@@ -16,6 +16,13 @@ $env:EPHEMERAL_WORKSPACE_CLEANUP_INTERVAL_SECONDS = "600"
 $env:DISABLE_DATA_CONNECTORS  = "true"         # file upload only
 $env:DISABLE_DISPLAY_KEYS     = "true"         # hide server-side API keys
 
+# The model everyone will use. Any OpenAI-compatible endpoint; the prefix is
+# just a label. Add DF_LLM_CA_BUNDLE if it presents an internal certificate.
+$env:MYGATEWAY_ENABLED        = "true"
+$env:MYGATEWAY_API_BASE       = "https://your-gateway.example.com/v1"
+$env:MYGATEWAY_API_KEY        = "<your key>"
+$env:MYGATEWAY_MODELS         = "gpt-4.1"
+
 uv run data_formulator --host 0.0.0.0 -p 5567
 ```
 
@@ -66,14 +73,30 @@ end up with nobody able to manage it.
 
 ## What each person can see
 
-| | Their own data | Other people's data | Accounts |
-|---|---|---|---|
-| User | yes | no | no |
-| Admin | yes | **no** | yes |
+| | Their own data | Other people's data | Accounts | Model configuration |
+|---|---|---|---|---|
+| User | yes | no | no | sees the loaded models, read-only |
+| Admin | yes | **no** | yes | yes |
 
 Isolation comes from storage paths keyed to the signed-in account, not from a
 role check, which is why an administrator has no way to read another person's
 workspaces. Manage-accounts is a separate power from read-data.
+
+## Models
+
+The models people can pick come from the environment variables above. Adding
+one names an outbound destination and an API key the server spends on
+everyone's behalf, so only administrators may do it: the configuration
+controls are hidden from everyone else, and every model route refuses a
+non-admin request that carries its own endpoint. Users see the loaded list and
+choose from it.
+
+`DF_ADMIN_USERS=alice,bob` grants the same power to named accounts — useful
+when this server authenticates through SSO instead of local accounts, where
+there is no `admin` role to read.
+
+Set `DISABLE_CUSTOM_MODELS=true` to take the configuration UI away from
+administrators too, leaving the environment file as the only way in.
 
 ## The two-hour rule
 

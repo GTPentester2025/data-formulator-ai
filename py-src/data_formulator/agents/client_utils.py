@@ -1,9 +1,13 @@
+import itertools
 import json
+import logging
 import re
 
 import litellm
 import os
 from types import SimpleNamespace
+
+logger = logging.getLogger(__name__)
 
 
 def normalize_openai_compatible_base(api_base: str) -> str:
@@ -33,17 +37,40 @@ def normalize_openai_compatible_base(api_base: str) -> str:
         base = base + "/v1"
     return base
 
-from azure.identity import AzureCliCredential, DefaultAzureCredential, get_bearer_token_provider
+
+
+def _ssl_verify_setting():
+    """Return the TLS-verification setting for outbound LLM calls.
+
+    ``True`` (the default) verifies against the system trust store. Operators
+    whose endpoint uses an internal CA set one of:
+
+    * ``DF_LLM_CA_BUNDLE=/path/to/internal-ca.pem`` — keeps verification on,
+      just against that CA. Preferred.
+    * ``DF_LLM_INSECURE_SKIP_VERIFY=1`` — disables verification entirely. This
+      accepts any certificate, including an attacker's, so use it only on a
+      trusted network when the CA file cannot be obtained.
+
+    Both are server-side env vars: a user cannot weaken TLS from the UI.
+    """
+    if os.environ.get("DF_LLM_INSECURE_SKIP_VERIFY", "").strip().lower() in (
+        "1", "true", "yes", "on",
+    ):
+        return False
+    ca_bundle = os.environ.get("DF_LLM_CA_BUNDLE", "").strip()
+    if ca_bundle:
+        return ca_bundle
+    return True
 
 
 def _synthesize_stream(response):
     """Yield LiteLLM-style streaming chunks reconstructed from a *buffered*
     response, so a caller that consumes a stream sees the same data.
 
-    Used for Ollama: LiteLLM's Ollama streaming path does not parse native
-    tool calls (it leaks the call as raw JSON ``content`` with
-    ``finish_reason='stop'``), whereas the buffered path parses them correctly.
-    We therefore call Ollama non-streaming and replay the result as a stream.
+    Used whenever the buffered path is the only one that works: an endpoint
+    that ignores ``stream: true`` and answers with a single JSON body, or one
+    whose streamed tool calls LiteLLM cannot parse. We call it non-streaming
+    and replay the result as a stream so the agents keep one code path.
     """
     try:
         choice0 = response.choices[0]
@@ -82,6 +109,121 @@ def _synthesize_stream(response):
         delta=SimpleNamespace(content=None, tool_calls=None,
                               reasoning_content=None),
         finish_reason=finish_reason)])
+
+
+class EndpointCapabilityError(RuntimeError):
+    """The endpoint answered, but cannot do what the request needs.
+
+    Distinct from a transport failure: retrying the same call another way will
+    not help, so :meth:`Client._dispatch` re-raises it instead of falling back
+    to a buffered request.
+    """
+
+
+def _guard_stream(chunks):
+    """Pass ``chunks`` through, guaranteeing the caller sees *something*.
+
+    Two endpoint behaviours otherwise end a chat in silence, because the agents
+    only forward ``delta.content`` and ``delta.tool_calls``:
+
+    * a reasoning model that streams the whole answer on ``reasoning_content``
+      and never emits ``content`` — common on gateways that expose a thinking
+      model without the matching answer channel;
+    * a stream that carries no deltas at all (empty completion, filtered
+      response, upstream cut short).
+
+    In both cases the run loop simply finds nothing and stops, and the user
+    sees their message sent with no reply. So we watch what actually goes past
+    and, if the stream ends without a single content token or tool call, emit
+    the reasoning text — or a plain explanation — as content before the final
+    chunk.
+    """
+    saw_output = False
+    reasoning = []
+    last_finish = "stop"
+
+    for chunk in chunks:
+        choices = getattr(chunk, "choices", None)
+        if choices:
+            choice0 = choices[0]
+            delta = getattr(choice0, "delta", None)
+            finish = getattr(choice0, "finish_reason", None)
+            if finish:
+                last_finish = finish
+            if delta is not None:
+                if getattr(delta, "content", None) or getattr(delta, "tool_calls", None):
+                    saw_output = True
+                rc = getattr(delta, "reasoning_content", None)
+                if rc:
+                    reasoning.append(rc)
+        yield chunk
+
+    if saw_output:
+        return
+
+    recovered = "".join(reasoning).strip()
+    if recovered:
+        logger.info("Stream carried only reasoning_content (%d chars); "
+                    "surfacing it as the reply", len(recovered))
+    else:
+        recovered = (
+            "The model endpoint returned an empty response. It accepted the "
+            "request but sent no answer — check the model name and any "
+            "content filter or token limit on the endpoint, then try again."
+        )
+        logger.warning("Stream ended with no content, tool calls or reasoning")
+
+    yield SimpleNamespace(choices=[SimpleNamespace(
+        delta=SimpleNamespace(content=recovered, tool_calls=None,
+                              reasoning_content=None),
+        finish_reason=None)])
+    yield SimpleNamespace(choices=[SimpleNamespace(
+        delta=SimpleNamespace(content=None, tool_calls=None,
+                              reasoning_content=None),
+        finish_reason=last_finish)])
+
+
+def _drain_until_output(chunks):
+    """Read *chunks* until the stream shows it is really answering.
+
+    Returns ``(consumed, produced)`` — the chunks read so far, and whether any
+    of them carried content, a tool call or reasoning. The caller replays
+    ``consumed`` ahead of the rest of the stream, so nothing is lost.
+
+    This exists because an endpoint that ignores ``stream: true`` and replies
+    with a single buffered JSON body does not raise: the streaming reader just
+    finds no events and ends. Without looking, that is indistinguishable from a
+    model with nothing to say, and the chat ends in silence.
+    """
+    consumed = []
+    for chunk in chunks:
+        consumed.append(chunk)
+        choices = getattr(chunk, "choices", None)
+        if not choices:
+            continue
+        delta = getattr(choices[0], "delta", None)
+        if delta is None:
+            continue
+        if (getattr(delta, "content", None)
+                or getattr(delta, "tool_calls", None)
+                or getattr(delta, "reasoning_content", None)):
+            return consumed, True
+    return consumed, False
+
+
+def _is_tool_support_error(error_text: str) -> bool:
+    """Whether the endpoint rejected the request because of ``tools``.
+
+    Gateways without function-calling answer 400 naming the parameter, so the
+    match stays on that name rather than on any one vendor's wording.
+    """
+    lowered = error_text.lower()
+    if "tool" not in lowered and "function call" not in lowered:
+        return False
+    return any(marker in lowered for marker in (
+        "unsupported", "not supported", "does not support", "unrecognized",
+        "unknown parameter", "invalid parameter", "unexpected keyword",
+    ))
 
 
 def _extract_json_objects(text):
@@ -197,6 +339,31 @@ def _match_tool_from_obj(obj, tools, _depth=0):
     return None
 
 
+def salvage_tool_call_from_text(text, tools):
+    """Return ``(tool_name, arguments)`` if *text* is really a tool call.
+
+    The streamed counterpart of :func:`_salvage_tool_calls_from_content`: an
+    endpoint without native function calling — or a weak model behind one —
+    streams the action as a JSON object on the content channel. The agents only
+    act on native ``tool_calls``, so without this the user is shown raw JSON
+    where an action should have happened.
+
+    Returns ``None`` when the text is ordinary prose, which is the common case,
+    so callers can use it as a last resort after a turn produced no tool call.
+    """
+    if not tools or not isinstance(text, str) or "{" not in text:
+        return None
+    for blob in _extract_json_objects(text):
+        try:
+            obj = json.loads(blob)
+        except (ValueError, TypeError):
+            continue
+        matched = _match_tool_from_obj(obj, tools)
+        if matched is not None:
+            return matched
+    return None
+
+
 def _salvage_tool_calls_from_content(response, tools):
     """If ``response`` carries an action as JSON *content* but no native
     ``tool_calls``, rewrite it into a proper tool call in place.
@@ -247,80 +414,61 @@ def _salvage_tool_calls_from_content(response, tools):
 
 
 class Client(object):
+    """A LiteLLM client for the one provider this deployment speaks: a
+    **custom OpenAI-compatible endpoint** (an internal gateway, LiteLLM proxy,
+    vLLM, Ollama's OpenAI shim, Azure AI Foundry's ``/openai/v1`` surface, ...).
+
+    Every model is reached over ``POST <api_base>/chat/completions`` with an
+    optional ``Authorization: Bearer <key>``, so there is a single request
+    shape to configure, allowlist and debug. The hosted-provider shortcuts
+    (``openai``/``azure``/``anthropic``/``gemini``/``ollama``) are gone; point
+    ``api_base`` at whichever endpoint you use instead.
     """
-    Returns a LiteLLM client configured for the specified endpoint and model.
-    Supports OpenAI, Azure, Ollama, and other providers via LiteLLM.
-    """
-    def __init__(self, endpoint, model, api_key=None,  api_base=None, api_version=None):
-        
+
+    #: The only accepted ``endpoint`` value. Kept as a constant so callers and
+    #: tests have one name to reference rather than a bare string literal.
+    ENDPOINT = "custom"
+
+    def __init__(self, endpoint, model, api_key=None, api_base=None, api_version=None):
+        endpoint = (endpoint or "").strip().lower() or self.ENDPOINT
+        if endpoint != self.ENDPOINT:
+            raise ValueError(
+                f"Unsupported provider {endpoint!r}. This deployment only calls "
+                f"custom OpenAI-compatible endpoints; configure the model with "
+                f"endpoint='{self.ENDPOINT}' and an API base URL."
+            )
+        if not api_base:
+            raise ValueError(
+                "An API base URL is required (e.g. https://your-gateway/v1)."
+            )
+
         self.endpoint = endpoint
-        self.model = model
         self.params = {}
 
-        if api_key is not None and api_key != "":
-            self.params["api_key"] = api_key
-        if api_base is not None and api_base != "":
-            self.params["api_base"] = api_base
-        if api_version is not None and api_version != "":
+        # LiteLLM routes on the model prefix; "openai/" selects the plain
+        # OpenAI-compatible transport, which is what every such endpoint speaks.
+        self.model = model if model.startswith("openai/") else f"openai/{model}"
+        self.params["api_base"] = normalize_openai_compatible_base(api_base)
+
+        # A blank key means the endpoint is keyless. Send no Authorization
+        # header at all rather than a placeholder: a gateway that requires a
+        # key answers a placeholder with "401 Missing Authentication header",
+        # which reads like a server fault instead of a missing key. LiteLLM
+        # insists on *some* api_key for this transport, so the placeholder
+        # survives only for the keyless case, where it is never inspected.
+        api_key = (api_key or "").strip()
+        self.params["api_key"] = api_key or "not-needed"
+
+        api_version = (api_version or "").strip()
+        if api_version:
             self.params["api_version"] = api_version
 
-        if self.endpoint == "openai":
-            if not model.startswith("openai/"):
-                self.model = f"openai/{model}"
-            if self.params.get("api_base"):
-                self.params["api_base"] = normalize_openai_compatible_base(
-                    self.params["api_base"])
-        elif self.endpoint == "custom":
-            # Any OpenAI-compatible endpoint (Azure AI Foundry, Groq,
-            # OpenRouter, LM Studio, vLLM, LiteLLM proxy, ...). Routed
-            # through LiteLLM's openai provider with a custom api_base.
-            if not api_base:
-                raise ValueError(
-                    "Custom provider requires an API base URL "
-                    "(e.g. https://<resource>.openai.azure.com/openai/v1)")
-            self.model = model if model.startswith("openai/") else f"openai/{model}"
-            self.params["api_base"] = normalize_openai_compatible_base(api_base)
-            if not self.params.get("api_key"):
-                # Some local OpenAI-compatible servers reject a missing key
-                # header outright; send a placeholder like other tools do.
-                self.params["api_key"] = "not-needed"
-        elif self.endpoint == "gemini":
-            if model.startswith("gemini/"):
-                self.model = model
-            else:
-                self.model = f"gemini/{model}"
-        elif self.endpoint == "anthropic":
-            if model.startswith("anthropic/"):
-                self.model = model
-            else:
-                self.model = f"anthropic/{model}"
-        elif self.endpoint == "azure":
-            if not api_base:
-                raise ValueError("Azure API base URL is required")
-            self.params["api_base"] = api_base.rstrip("/")
-            if api_key is None or api_key == "":
-                credential = (
-                    AzureCliCredential()
-                    if os.environ.get("DATA_FORMULATOR_DESKTOP") == "1"
-                    else DefaultAzureCredential()
-                )
-                token_provider = get_bearer_token_provider(
-                    credential, "https://cognitiveservices.azure.com/.default"
-                )
-                self.params["azure_ad_token_provider"] = token_provider
-            self.params["custom_llm_provider"] = "azure"
-        elif self.endpoint == "ollama":
-            ollama_base = api_base if api_base else "http://localhost:11434"
-            # LiteLLM appends "/api/generate" itself, so strip a user-supplied
-            # trailing "/api" (and any trailing slashes) to avoid "/api/api/generate".
-            ollama_base = ollama_base.rstrip("/")
-            if ollama_base.endswith("/api"):
-                ollama_base = ollama_base[: -len("/api")]
-            self.params["api_base"] = ollama_base
-            if model.startswith("ollama/"):
-                self.model = model
-            else:
-                self.model = f"ollama/{model}"
+        ssl_verify = _ssl_verify_setting()
+        if ssl_verify is not True:
+            # An internal endpoint often presents a self-signed or internal-CA
+            # certificate. DF_LLM_CA_BUNDLE trusts that CA (verification stays
+            # on); DF_LLM_INSECURE_SKIP_VERIFY turns verification off outright.
+            self.params["ssl_verify"] = ssl_verify
 
     def _strip_image_blocks(self, content):
         """Remove image_url blocks from multimodal content arrays."""
@@ -382,10 +530,10 @@ class Client(object):
         ``none/low/medium/high/xhigh``). The provider message reliably
         mentions the parameter name.
 
-        Also covers Ollama models that lack reasoning support: LiteLLM maps
-        ``reasoning_effort`` to Ollama's ``think`` flag, and such models reject
-        it with ``"<model> does not support thinking"``. Retrying without
-        ``reasoning_effort`` (which drops ``think``) lets these models run."""
+        Also covers non-reasoning models behind a gateway that maps
+        ``reasoning_effort`` onto its own thinking flag and rejects it with
+        ``"<model> does not support thinking"``. Retrying without
+        ``reasoning_effort`` lets these models run."""
         lowered = error_text.lower()
         return "reasoning_effort" in lowered or "does not support thinking" in lowered
 
@@ -419,22 +567,32 @@ class Client(object):
         messages = [{"role": "user", "content": "Reply only 'ok'."}]
         params = self.params.copy()
         params["timeout"] = timeout
-        litellm.completion(
-            model=self.model, messages=messages,
-            max_tokens=3, drop_params=True, _skip_mcp_handler=True, **params,
-        )
+        # Through _complete so a keyless-model 401 reads as "add the key"
+        # rather than the endpoint's own "Missing Authentication header".
+        self._complete(buffered=True, model=self.model, messages=messages,
+                       max_tokens=3, drop_params=True, _skip_mcp_handler=True,
+                       **params)
 
     def _dispatch(self, *, messages, stream, params, tools=None, extra=None):
-        """Issue the LiteLLM call, transparently handling Ollama streaming.
+        """Issue the LiteLLM call, absorbing the ways an OpenAI-compatible
+        gateway can differ from OpenAI itself.
 
-        Ollama's streaming path in LiteLLM fails to parse native tool calls, so
-        for Ollama we always call non-streaming and, when the caller asked for a
-        stream, replay the buffered response as streaming chunks via
-        ``_synthesize_stream``. All other providers stream natively."""
-        is_ollama = self.endpoint == "ollama"
-        effective_stream = stream and not is_ollama
+        Three of those differences used to end a chat with no reply:
+
+        * **Streaming refused.** Some gateways ignore ``stream: true`` and
+          answer with one buffered JSON body; the OpenAI client cannot read
+          that as a stream and raises a bare "Connection error", which reads
+          like the endpoint is down. We retry the same call buffered and replay
+          it as a stream, so the agents keep one code path.
+        * **Tool calls as content.** A gateway that has no native function
+          calling — or a weak model behind one — writes the call as a JSON
+          object in ``content``. ``_salvage_tool_calls_from_content`` recovers
+          it; it runs over every buffered response.
+        * **Tools rejected outright.** Re-raised with wording that names the
+          endpoint's missing capability instead of the raw parameter error.
+        """
         call_kwargs = dict(model=self.model, messages=messages,
-                           drop_params=True, stream=effective_stream,
+                           drop_params=True,
                            # We never use litellm's built-in MCP gateway. Setting this
                            # skips litellm's proxy/MCP handler import path, which pulls
                            # in fastapi and is not a dependency of this project
@@ -443,21 +601,94 @@ class Client(object):
                            **params, **(extra or {}))
         if tools is not None:
             call_kwargs["tools"] = tools
-        resp = litellm.completion(**call_kwargs)
-        if is_ollama and tools:
-            resp = _salvage_tool_calls_from_content(resp, tools)
-        if is_ollama and stream:
-            return _synthesize_stream(resp)
-        return resp
+
+        if not stream:
+            response = self._complete(buffered=True, **call_kwargs)
+            return _salvage_tool_calls_from_content(response, tools) if tools else response
+
+        stream_error = None
+        head, produced = [], False
+        try:
+            chunks = self._complete(buffered=False, **call_kwargs)
+            head, produced = _drain_until_output(chunks)
+        except EndpointCapabilityError:
+            # A capability the endpoint lacks; a second attempt cannot supply it.
+            raise
+        except Exception as e:
+            stream_error = e
+
+        if produced:
+            return _guard_stream(itertools.chain(head, chunks))
+
+        # Nothing came back on the stream — either the call failed outright, or
+        # the endpoint ignored ``stream: true`` and answered with one buffered
+        # JSON body that the streaming reader silently reads as empty. Both
+        # look identical from here, and both are fixed by asking again without
+        # streaming.
+        try:
+            response = self._complete(buffered=True, **call_kwargs)
+        except Exception:
+            # The endpoint is genuinely failing. Report why the stream failed
+            # if we have it; otherwise let the guard explain the empty answer.
+            if stream_error is not None:
+                raise stream_error from None
+            return _guard_stream(iter(head))
+
+        logger.info("Endpoint returned nothing on the stream (%s); retried "
+                    "buffered and replayed the answer as a stream",
+                    str(stream_error)[:120] if stream_error else "empty stream")
+        if tools:
+            response = _salvage_tool_calls_from_content(response, tools)
+        return _guard_stream(_synthesize_stream(response))
+
+    def _complete(self, *, buffered, **call_kwargs):
+        """Call LiteLLM, translating two endpoint errors into plain wording.
+
+        Left raw, both send the user hunting in the wrong place: a missing key
+        surfaces as the endpoint's own "Missing Authentication header" (which
+        reads like a server fault), and a gateway without function calling
+        surfaces as an opaque parameter error.
+        """
+        try:
+            return litellm.completion(stream=not buffered, **call_kwargs)
+        except Exception as e:
+            message = str(e)
+            if _is_tool_support_error(message):
+                raise EndpointCapabilityError(
+                    "This endpoint rejected the tool definitions the agent "
+                    "needs, so it cannot run the data agents. Point the model "
+                    "at an endpoint with OpenAI-style function calling."
+                ) from e
+            if self._is_missing_key_error(message):
+                raise EndpointCapabilityError(
+                    "The endpoint refused the request for lack of credentials, "
+                    "and this model is configured without an API key. Add the "
+                    "key to the model's configuration."
+                ) from e
+            raise
+
+    def _is_missing_key_error(self, error_text: str) -> bool:
+        """Whether a 401 came back on a model configured with no API key.
+
+        ``self.params['api_key']`` is the ``"not-needed"`` placeholder in that
+        case (LiteLLM requires the field), so the endpoint saw a nonsense
+        bearer token and answered as if none was sent.
+        """
+        if self.params.get("api_key") != "not-needed":
+            return False
+        lowered = error_text.lower()
+        return ("authenticationerror" in lowered
+                or "missing authentication" in lowered
+                or "invalid api key" in lowered
+                or "401" in lowered)
 
     def get_completion(self, messages, stream=False, reasoning_effort="low",
                        **kwargs):
         """Send a chat completion request via LiteLLM.
 
-        All providers (OpenAI, Azure, Anthropic, etc.) are handled uniformly
-        by LiteLLM.  ``drop_params=True`` ensures unsupported parameters
-        (like ``reasoning_effort`` on non-reasoning models) are silently
-        ignored rather than causing errors.
+        ``drop_params=True`` ensures parameters the endpoint does not know
+        (like ``reasoning_effort`` on a non-reasoning model) are dropped
+        rather than causing errors.
         """
         params = self.params.copy()
         params["reasoning_effort"] = reasoning_effort

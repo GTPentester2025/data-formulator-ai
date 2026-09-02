@@ -32,14 +32,16 @@ pytestmark = [pytest.mark.backend]
 
 @pytest.fixture()
 def client():
-    """Return a Client wired to the litellm (non-openai) path."""
-    return Client(endpoint="other", model="deepseek-chat")
+    """A keyless custom endpoint — the only provider shape there is."""
+    return Client(endpoint="custom", model="deepseek-chat",
+                  api_base="https://gateway.internal/v1")
 
 
 @pytest.fixture()
 def openai_client():
-    """Return a Client wired to the openai path."""
-    return Client(endpoint="openai", model="deepseek-chat", api_key="fake")
+    """The same endpoint with a key, for the paths that need one."""
+    return Client(endpoint="custom", model="deepseek-chat", api_key="fake",
+                  api_base="https://gateway.internal/v1")
 
 
 # ---------------------------------------------------------------------------
